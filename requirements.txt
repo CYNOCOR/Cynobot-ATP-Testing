@@ -1,0 +1,8 @@
+pipecat-ai[google,silero,webrtc,whisper,kokoro,ollama]==1.15.0
+# Pipecat's Whisper module also requires mlx-whisper on Apple Silicon Macs (dev machines only)
+pipecat-ai[mlx-whisper]==1.15.0; sys_platform == "darwin" and platform_machine == "arm64"
+fastapi
+uvicorn[standard]
+python-dotenv
+pywebview
+psutil

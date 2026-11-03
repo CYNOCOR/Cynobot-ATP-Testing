@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cyno Control</title>
+<style>
+  /* Four colors: background, surface, text (with opacity steps), one accent. */
+  :root {
+    --bg: #f5f5f7;
+    --surface: rgba(255, 255, 255, 0.72);
+    --text: 29, 29, 31;
+    --accent: #0071e3;
+    --ink: rgb(var(--text));
+    --ink-2: rgba(var(--text), 0.62);
+    --ink-3: rgba(var(--text), 0.38);
+    --hair: rgba(var(--text), 0.08);
+    --fill: rgba(var(--text), 0.05);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    --radius: 12px;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, Menlo, monospace;
+  }
+  /* Dark palette: follows the system ("Auto") unless the app's Appearance switch says Light or Dark. */
+  :root[data-theme="dark"] {
+    --bg: #1c1c1e;
+    --surface: rgba(44, 44, 46, 0.72);
+    --text: 245, 245, 247;
+    --accent: #0a84ff;
+    --hair: rgba(var(--text), 0.1);
+    --fill: rgba(var(--text), 0.07);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1c1e;
+      --surface: rgba(44, 44, 46, 0.72);
+      --text: 245, 245, 247;
+      --accent: #0a84ff;
+      --hair: rgba(var(--text), 0.1);
+      --fill: rgba(var(--text), 0.07);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  body { transition: background-color .3s var(--ease), color .3s var(--ease); }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font: 400 14px/1.45 var(--font);
+    -webkit-font-smoothing: antialiased; display: flex; overflow: hidden; user-select: none;
+  }
+  button, input, select { font: inherit; color: inherit; }
+
+  /* ---------- Sidebar ---------- */
+  nav {
+    width: 216px; flex: none; padding: 24px 12px; display: flex; flex-direction: column; gap: 4px;
+    background: var(--surface); backdrop-filter: saturate(180%) blur(24px); -webkit-backdrop-filter: saturate(180%) blur(24px);
+    border-right: 1px solid var(--hair);
+  }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 0 8px 24px; font-weight: 600; font-size: 16px; }
+  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-3); transition: background .3s var(--ease); }
+  .brand-dot.live { background: var(--accent); }
+  .nav-item {
+    appearance: none; border: 0; background: transparent; text-align: left; cursor: pointer;
+    padding: 8px 12px; border-radius: 8px; color: var(--ink-2); transition: background .2s var(--ease), color .2s var(--ease);
+  }
+  .nav-item:hover { background: var(--fill); color: var(--ink); }
+  .nav-item.active { background: var(--fill); color: var(--ink); font-weight: 600; }
+  .nav-foot { margin-top: auto; padding: 8px 12px; color: var(--ink-3); font-size: 12px; }
+
+  /* ---------- Content ---------- */
+  main { flex: 1; overflow-y: auto; padding: 40px 48px 64px; }
+  .page { max-width: 760px; margin: 0 auto; display: none; flex-direction: column; gap: 32px; }
+  .page.active { display: flex; animation: enter .28s var(--ease); }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+  .lede { color: var(--ink-2); margin-top: 4px; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--ink-2); padding: 0 16px 8px; }
+
+  .card {
+    background: var(--surface); backdrop-filter: saturate(180%) blur(24px); -webkit-backdrop-filter: saturate(180%) blur(24px);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+
+  /* Hero */
+  .hero { padding: 40px 32px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .hero-title { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; }
+  .hero-sub { color: var(--ink-2); }
+  .hero-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+  /* Buttons */
+  .btn {
+    appearance: none; border: 0; cursor: pointer; border-radius: 8px; padding: 8px 16px; font-weight: 600;
+    background: var(--fill); color: var(--ink);
+    transition: transform .15s var(--ease), background .2s var(--ease), opacity .2s var(--ease);
+  }
+  .btn:hover { background: var(--hair); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { opacity: 0.88; }
+  .btn.large { padding: 12px 24px; font-size: 15px; border-radius: 10px; }
+  .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .link { color: var(--accent); text-decoration: none; cursor: pointer; }
+
+  /* Stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .tile { padding: 16px; display: flex; flex-direction: column; gap: 4px; min-height: 96px; }
+  .tile-label { color: var(--ink-2); font-size: 12px; }
+  .tile-value { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .tile-note { color: var(--ink-3); font-size: 12px; }
+
+  /* Grouped list (inset, like system settings) */
+  .group { overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; min-height: 48px; }
+  .row + .row { border-top: 1px solid var(--hair); }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-weight: 400; }
+  .row-sub { color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+  .row-value { color: var(--ink-2); text-align: right; }
+  .status { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+  .dot.on { background: var(--accent); }
+
+  /* Inputs */
+  .field {
+    width: 240px; padding: 8px 12px; border-radius: 8px; border: 0; outline: none;
+    background: var(--fill); transition: box-shadow .2s var(--ease);
+  }
+  .field:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+  select.field { appearance: none; cursor: pointer; padding-right: 32px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%), linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .key-wrap { display: flex; gap: 8px; align-items: center; }
+
+  /* Switch */
+  .switch { position: relative; width: 44px; height: 26px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; border-radius: 13px; background: var(--hair); cursor: pointer; transition: background .25s var(--ease); }
+  .switch span::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform .25s var(--ease);
+  }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .switch input:disabled + span { opacity: 0.4; cursor: default; }
+
+  /* Segmented control */
+  .seg { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--fill); gap: 2px; }
+  .seg button {
+    appearance: none; border: 0; background: transparent; cursor: pointer; padding: 6px 16px; border-radius: 7px;
+    color: var(--ink-2); transition: background .2s var(--ease), color .2s var(--ease), box-shadow .2s var(--ease);
+  }
+  .seg button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+  /* Conversation */
+  .convo { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .say-label { font-size: 12px; color: var(--ink-3); margin-bottom: 4px; }
+  .say { font-size: 17px; line-height: 1.4; }
+  .say.muted { color: var(--ink-3); }
+
+  /* Logs */
+  .log {
+    font: 12px/1.6 var(--mono); padding: 16px; height: 480px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+    user-select: text; color: var(--ink-2);
+  }
+  .log .err { color: var(--ink); font-weight: 600; }
+  .bench { font: 12px/1.6 var(--mono); padding: 0 16px 16px; white-space: pre-wrap; color: var(--ink-2); user-select: text; }
+  .bench:empty { display: none; }
+
+  .toolbar { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 0 0 8px; }
+
+  /* Banner + toast */
+  .banner { padding: 16px; display: none; align-items: center; gap: 16px; }
+  .banner.show { display: flex; animation: enter .28s var(--ease); }
+  .banner .row-main { color: var(--ink-2); }
+  .toast {
+    position: fixed; left: 50%; bottom: 32px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+    padding: 12px 20px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .25s var(--ease), transform .25s var(--ease);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* Brand (Cynocor logos are monochrome: black in light mode, white in dark mode) */
+  .brand-mark { width: 24px; height: 29px; flex: none; background: url("assets/cynocor-wolf-black.png") center / contain no-repeat; }
+  .wordmark { width: 152px; height: 36px; background: url("assets/cynocor-wordmark-black.png") left center / contain no-repeat; opacity: 0.85; }
+  :root[data-theme="dark"] .brand-mark { background-image: url("assets/cynocor-wolf-white.png"); }
+  :root[data-theme="dark"] .wordmark { background-image: url("assets/cynocor-wordmark-white.png"); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .brand-mark { background-image: url("assets/cynocor-wolf-white.png"); }
+    :root:not([data-theme="light"]) .wordmark { background-image: url("assets/cynocor-wordmark-white.png"); }
+  }
+  .appearance { display: flex; flex-direction: column; gap: 8px; padding: 0 0 16px; }
+  .appearance .seg { width: 100%; }
+  .appearance .seg button { flex: 1; padding: 6px 0; font-size: 12px; }
+  .warn { font-size: 12px; color: var(--ink); background: var(--fill); border-radius: 8px; padding: 8px 12px; display: none; }
+  .warn.show { display: block; }
+  .brand-name { display: flex; flex-direction: column; line-height: 1.2; }
+  .brand-name small { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+
+  /* Knowledge */
+  textarea.field { width: 100%; min-height: 112px; resize: vertical; line-height: 1.5; font-family: var(--font); }
+  .stack { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .stack label { font-size: 12px; color: var(--ink-2); }
+  .stack .field { width: 100%; }
+  .stack-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 8px; }
+  .hint { color: var(--ink-3); font-size: 12px; }
+  .row.tap { cursor: pointer; transition: background .2s var(--ease); }
+  .row.tap:hover { background: var(--fill); }
+  .fact-answer { color: var(--ink-2); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--fill); color: var(--ink-2); white-space: nowrap; }
+  .chevron { color: var(--ink-3); }
+  .search { display: flex; gap: 8px; }
+  .search .field { flex: 1; width: auto; }
+  .result { padding: 12px 16px; border-top: 1px solid var(--hair); }
+  .result:first-child { border-top: 0; }
+  .empty { padding: 24px 16px; text-align: center; color: var(--ink-3); }
+
+  /* Sheet (modal editor) */
+  .scrim {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .25s var(--ease); z-index: 50;
+  }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    width: min(560px, calc(100% - 48px)); max-height: calc(100% - 48px); overflow-y: auto; padding: 24px;
+    display: flex; flex-direction: column; gap: 16px; transform: translateY(16px) scale(0.98); transition: transform .3s var(--ease);
+    background: var(--bg); border-radius: 16px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  }
+  .scrim.show .sheet { transform: none; }
+  .sheet h3 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .sheet .stack { padding: 0; }
+  .sheet-foot { display: flex; gap: 8px; align-items: center; }
+  .sheet-foot .spacer { flex: 1; }
+
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, 1fr); } main { padding: 32px 24px 48px; } }
+</style>
+</head>
+<body>
+  <nav>
+    <div class="brand">
+      <span class="brand-mark" role="img" aria-label="Cynocor"></span>
+      <span class="brand-name">Cyno Control<small><span class="brand-dot" id="brandDot" style="display:inline-block;width:6px;height:6px;margin-right:4px;vertical-align:middle"></span><span id="brandState">Stopped</span></small></span>
+    </div>
+    <button class="nav-item active" data-page="overview">Overview</button>
+    <button class="nav-item" data-page="knowledge">Knowledge</button>
+    <button class="nav-item" data-page="controls">Controls</button>
+    <button class="nav-item" data-page="settings">Settings</button>
+    <button class="nav-item" data-page="activity">Activity</button>
+    <div class="nav-foot">
+      <div class="appearance">
+        <span class="hint">Appearance</span>
+        <div class="seg" id="segTheme2" role="group" aria-label="Appearance"><button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div>
+      </div>
+      <div class="wordmark" role="img" aria-label="Cynocor, the apex animal of advanced systems"></div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ================= Overview ================= -->
+    <section class="page active" id="overview">
+      <div class="card hero">
+        <div class="hero-title" id="heroTitle">Cyno is stopped</div>
+        <div class="hero-sub" id="heroSub">Start the server to bring the robot online.</div>
+        <div class="hero-actions">
+          <button class="btn primary large" id="btnStart">Start Cyno</button>
+          <button class="btn large" id="btnRestart">Restart</button>
+          <button class="btn large" id="btnStop">Stop</button>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <div class="card tile"><span class="tile-label">Brain</span><span class="tile-value" id="tMode">—</span><span class="tile-note" id="tModeNote">No conversation</span></div>
+        <div class="card tile"><span class="tile-label">Reply delay</span><span class="tile-value" id="tDelay">—</span><span class="tile-note" id="tDelayNote">Average of last 20</span></div>
+        <div class="card tile"><span class="tile-label">Questions heard</span><span class="tile-value" id="tTurns">0</span><span class="tile-note" id="tKb">0 campus lookups</span></div>
+        <div class="card tile"><span class="tile-label">Sessions</span><span class="tile-value" id="tSessions">0</span><span class="tile-note" id="tSessionsNote">0 online · 0 offline</span></div>
+        <div class="card tile"><span class="tile-label">Fallbacks to offline</span><span class="tile-value" id="tFallbacks">0</span><span class="tile-note">Wi-Fi or Gemini drops</span></div>
+        <div class="card tile"><span class="tile-label">Server uptime</span><span class="tile-value" id="tUptime">—</span><span class="tile-note" id="tPort">Port 7860</span></div>
+        <div class="card tile"><span class="tile-label">CPU</span><span class="tile-value" id="tCpu">—</span><span class="tile-note">This computer</span></div>
+        <div class="card tile"><span class="tile-label">Memory</span><span class="tile-value" id="tMem">—</span><span class="tile-note" id="tMemNote"></span></div>
+      </div>
+
+      <div>
+        <h2>Live conversation</h2>
+        <div class="card convo">
+          <div><div class="say-label">Visitor</div><div class="say muted" id="sayUser">Nobody is talking yet.</div></div>
+          <div><div class="say-label">Cyno</div><div class="say" id="sayBot">—</div></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Services</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Gemini Live</div><div class="row-sub">Online brain and voice</div></div><span class="status" id="sGemini"><span class="dot"></span>Checking…</span></div>
+          <div class="row"><div class="row-main"><div class="row-title">Ollama</div><div class="row-sub" id="sOllamaSub">Offline brain</div></div><span class="status" id="sOllama"><span class="dot"></span>Checking…</span></div>
+          <div class="row"><div class="row-main"><div class="row-title">Offline voice and hearing</div><div class="row-sub">Whisper and Kokoro, loaded at start</div></div><span class="status" id="sOffline"><span class="dot"></span>Not loaded</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Knowledge ================= -->
+    <section class="page" id="knowledge">
+      <div><h1>Knowledge</h1><p class="lede">Teach Cyno what to say and how to behave. Changes apply from the next conversation.</p></div>
+
+      <div>
+        <h2>Instructions</h2>
+        <div class="card stack">
+          <label for="fInstructions">How Cyno should behave</label>
+          <textarea class="field" id="fInstructions" placeholder="For example: Today is the IIT Open Day. Invite visitors to the Main Auditorium for the 10 AM welcome talk. Speak a little slower."></textarea>
+          <label for="fGreeting">Greeting</label>
+          <input class="field" id="fGreeting" />
+          <div class="stack-foot">
+            <span class="hint">Use instructions for behaviour and announcements. Put facts below so Cyno only answers what you've confirmed.</span>
+            <button class="btn primary" id="btnSaveInstr">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Answer rules</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Strict answers</div><div class="row-sub">Only confirmed facts, no guessing. If Cyno doesn't know or facts disagree, it says so and points to the front desk.</div></div><label class="switch"><input type="checkbox" id="swStrict" /><span></span></label></div>
+          <div class="row"><div class="row-main"><div class="row-title">Stay on topic</div><div class="row-sub">Politely decline questions that aren't about IIT</div></div><label class="switch"><input type="checkbox" id="swOnTopic" /><span></span></label></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="toolbar" style="padding:0 0 8px 16px">
+          <h2 style="padding:0">Campus facts <span id="factCount" style="font-weight:400"></span></h2>
+          <button class="btn primary" id="btnAddFact">Add fact</button>
+        </div>
+        <div class="card group" id="factList"></div>
+      </div>
+
+      <div>
+        <h2>Try a question</h2>
+        <div class="card group">
+          <div class="row search"><input class="field" id="fTry" placeholder="Where is the library?" /><button class="btn" id="btnTry">Check</button></div>
+          <div id="tryResults"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Controls ================= -->
+    <section class="page" id="controls">
+      <div><h1>Controls</h1><p class="lede">Drive the robot's screens and test its fallbacks.</p></div>
+
+      <div>
+        <h2>Displays</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Chest touchscreen</div><div class="row-sub">Microphone, speaker, captions and info cards</div></div><button class="btn" data-open="chest">Open</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Face display</div><div class="row-sub">Second screen. Press F for fullscreen.</div></div><button class="btn" data-open="face">Open</button></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Face</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Expression</div><div class="row-sub">Overrides until Cyno next speaks</div></div>
+            <div class="seg" id="segExpr"><button data-v="IDLE">Idle</button><button data-v="HAPPY">Happy</button><button data-v="THINKING">Thinking</button><button data-v="SPEAKING">Speaking</button></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Color</div></div>
+            <div class="seg" id="segTheme"><button data-v="RED">Red</button><button data-v="BLUE">Blue</button></div></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Offline mode</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Ollama</div><div class="row-sub">Must be running for offline answers</div></div><button class="btn" id="btnOllama">Start Ollama</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Speed benchmark</div><div class="row-sub">Times Whisper, Ollama and Kokoro on this computer (1–3 min)</div></div><button class="btn" id="btnBench">Run</button></div>
+          <div class="bench" id="benchOut"></div>
+          <div class="row"><div class="row-main"><div class="row-title">Simulate Wi-Fi drop</div><div class="row-sub" id="outageSub">Cuts Gemini so you can watch Cyno fall back. Needs Debug tools.</div></div><label class="switch"><input type="checkbox" id="swOutage" /><span></span></label></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Settings ================= -->
+    <section class="page" id="settings">
+      <div><h1>Settings</h1><p class="lede">Saved to <code>.env</code> on this computer. Restart Cyno to apply.</p></div>
+
+      <div class="card banner" id="restartBanner">
+        <div class="row-main">Saved. Restart Cyno to use the new settings.</div>
+        <button class="btn primary" id="btnBannerRestart">Restart now</button>
+      </div>
+
+      <div>
+        <h2>Online · Gemini</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">API key</div><div class="row-sub" id="keySub">Free from <a class="link" id="keyLink">aistudio.google.com/apikey</a></div></div>
+            <div class="key-wrap"><input class="field" type="password" id="fKey" autocomplete="off" spellcheck="false" /><button class="btn" id="btnShowKey">Show</button></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Voice</div></div><select class="field" data-key="GEMINI_VOICE"></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Model</div><div class="row-sub">Leave empty for the default</div></div><input class="field" data-key="GEMINI_MODEL" placeholder="models/gemini-3.8-live" /></div>
+          <div class="row"><div class="row-main"><div class="row-title">Languages</div><div class="row-sub">Add <code>si-LK</code> for Sinhala later</div></div><input class="field" data-key="CYNO_LANGUAGES" placeholder="en-US" /></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Offline · on this computer</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Brain (Ollama model)</div><div class="row-sub">Smaller models answer faster</div></div><select class="field" data-key="OLLAMA_MODEL"></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Hearing (Whisper model)</div><div class="row-sub">base.en is faster, small.en is more accurate</div></div><select class="field" data-key="WHISPER_MODEL"></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Voice (Kokoro)</div></div><select class="field" data-key="KOKORO_VOICE"></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Voice CPU threads</div><div class="row-sub">Empty = automatic</div></div><input class="field" data-key="KOKORO_THREADS" inputmode="numeric" placeholder="Automatic" /></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Server</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Port</div></div><input class="field" data-key="PORT" inputmode="numeric" placeholder="7860" /></div>
+          <div class="row"><div class="row-main"><div class="row-title">Always use offline mode</div><div class="row-sub">Rehearse without Gemini</div></div><label class="switch"><input type="checkbox" data-key="CYNO_FORCE_OFFLINE" /><span></span></label></div>
+          <div class="row"><div class="row-main"><div class="row-title">Debug tools</div><div class="row-sub">Enables the Wi-Fi drop simulator</div></div><label class="switch"><input type="checkbox" data-key="CYNO_DEBUG" /><span></span></label></div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn" id="btnRevert">Revert</button>
+        <button class="btn primary" id="btnSave">Save</button>
+      </div>
+    </section>
+
+    <!-- ================= Activity ================= -->
+    <section class="page" id="activity">
+      <div><h1>Activity</h1><p class="lede">Live server log.</p></div>
+      <div>
+        <div class="toolbar">
+          <div class="seg" id="segLog"><button data-v="all" class="on">All</button><button data-v="err">Problems</button></div>
+          <div style="display:flex; align-items:center; gap:16px;">
+            <span class="status">Debug lines <label class="switch"><input type="checkbox" id="swDebugLines" /><span></span></label></span>
+            <button class="btn" id="btnClearLog">Clear</button>
+          </div>
+        </div>
+        <div class="card log" id="log"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="scrim" id="factScrim">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="factTitleHead">
+      <h3 id="factTitleHead">New fact</h3>
+      <div class="stack">
+        <label for="fFactTitle">Title</label>
+        <input class="field" id="fFactTitle" placeholder="Library" />
+        <label for="fFactAnswer">What Cyno should say</label>
+        <textarea class="field" id="fFactAnswer" placeholder="The library is on the second floor, next to the lifts. It's open from 8 AM to 8 PM."></textarea>
+        <label for="fFactKeywords">Words visitors might use, separated by commas</label>
+        <input class="field" id="fFactKeywords" placeholder="library, books, study, reading" />
+        <span class="hint">Leave empty to use words from the title.</span>
+        <div class="warn" id="overlapWarn"></div>
+        <label for="fFactSource">Source</label>
+        <input class="field" id="fFactSource" placeholder="Where this came from" />
+      </div>
+      <div class="row" style="padding:0"><div class="row-main"><div class="row-title">Confirmed by the team</div><div class="row-sub">Unconfirmed facts are flagged for checking</div></div><label class="switch"><input type="checkbox" id="fFactVerified" checked /><span></span></label></div>
+      <div class="sheet-foot">
+        <button class="btn" id="btnDeleteFact">Delete</button>
+        <span class="spacer"></span>
+        <button class="btn" id="btnCancelFact">Cancel</button>
+        <button class="btn primary" id="btnSaveFact">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let api = null;
+let lastStatus = null;
+let settings = null;
+
+// ---------- helpers ----------
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+async function call(name, ...args) {
+  try {
+    const r = await api[name](...args);
+    if (r && r.ok === false && r.error) toast(r.error);
+    return r;
+  } catch (e) { toast(String(e)); return null; }
+}
+function fmtDur(s) {
+  if (s == null) return '—';
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+function setStatus(el, on, text) { el.innerHTML = `<span class="dot ${on ? 'on' : ''}"></span>${text}`; }
+function setSeg(seg, value) { [...$(seg).children].forEach(b => b.classList.toggle('on', b.dataset.v === value)); }
+
+// ---------- navigation ----------
+document.querySelectorAll('.nav-item').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n === b));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === b.dataset.page));
+  if (b.dataset.page === 'settings') loadSettings();
+  if (b.dataset.page === 'knowledge') loadKnowledge();
+}));
+
+// ---------- overview ----------
+function render(s) {
+  lastStatus = s;
+  const srv = s.server, st = s.state, stats = s.stats;
+  const live = st && st.voice_status === 'LIVE';
+  $('brandDot').classList.toggle('live', srv.running);
+  $('brandState').textContent = srv.starting ? 'Starting…' : !srv.running ? 'Stopped' : live ? (st.voice_mode === 'OFFLINE' ? 'Live · offline' : 'Live · online') : 'Ready';
+
+  if (srv.starting) { $('heroTitle').textContent = 'Starting Cyno…'; $('heroSub').textContent = 'Loading the server. This takes a few seconds.'; }
+  else if (!srv.running) { $('heroTitle').textContent = 'Cyno is stopped'; $('heroSub').textContent = 'Start the server to bring the robot online.'; }
+  else if (live) { $('heroTitle').textContent = 'Cyno is listening'; $('heroSub').textContent = `${st.voice_mode === 'OFFLINE' ? 'Offline mode' : 'Online with Gemini'} · conversation ${fmtDur(stats && stats.session_s)}`; }
+  else { $('heroTitle').textContent = 'Cyno is ready'; $('heroSub').textContent = 'Waiting for someone to tap “Tap to talk” on the chest screen.'; }
+  if (srv.running && !srv.owned) $('heroSub').textContent += ' · started outside this app';
+
+  $('btnStart').disabled = srv.running || srv.starting;
+  $('btnStop').disabled = !srv.owned;
+  $('btnRestart').disabled = !srv.owned;
+
+  $('tMode').textContent = live ? (st.voice_mode === 'OFFLINE' ? 'Offline' : 'Online') : '—';
+  $('tModeNote').textContent = live ? (st.voice_mode === 'OFFLINE' ? 'Whisper · Ollama · Kokoro' : 'Gemini Live') : (s.force_offline ? 'Forced offline' : 'No conversation');
+  $('tDelay').textContent = stats && stats.avg_delay_s != null ? `${stats.avg_delay_s.toFixed(1)}s` : '—';
+  $('tDelayNote').textContent = stats && stats.last_delay_s != null ? `Last ${stats.last_delay_s.toFixed(1)}s · avg of 20` : 'Average of last 20';
+  $('tTurns').textContent = stats ? stats.turns : 0;
+  $('tKb').textContent = `${stats ? stats.kb_lookups : 0} campus lookups`;
+  $('tSessions').textContent = stats ? stats.sessions_online + stats.sessions_offline : 0;
+  $('tSessionsNote').textContent = `${stats ? stats.sessions_online : 0} online · ${stats ? stats.sessions_offline : 0} offline`;
+  $('tFallbacks').textContent = stats ? stats.fallbacks : 0;
+  $('tUptime').textContent = stats ? fmtDur(stats.uptime_s) : '—';
+  $('tPort').textContent = `Port ${srv.port}`;
+  $('tCpu').textContent = `${Math.round(s.system.cpu)}%`;
+  $('tMem').textContent = `${Math.round(s.system.mem_percent)}%`;
+  $('tMemNote').textContent = `${s.system.mem_used_gb} of ${s.system.mem_total_gb} GB`;
+
+  const user = st && st.user_text;
+  $('sayUser').textContent = user || 'Nobody is talking yet.';
+  $('sayUser').classList.toggle('muted', !user);
+  $('sayBot').textContent = (st && st.last_spoken_text) || '—';
+
+  const g = s.gemini;
+  if (!g.key_set) setStatus($('sGemini'), false, 'No API key');
+  else if (g.reachable === false) setStatus($('sGemini'), false, 'Unreachable');
+  else if (g.reachable) setStatus($('sGemini'), true, 'Reachable');
+  const o = s.ollama;
+  if (!o.running) setStatus($('sOllama'), false, 'Not running');
+  else if (!o.models.includes(o.wanted)) setStatus($('sOllama'), false, `${o.wanted} not downloaded`);
+  else setStatus($('sOllama'), true, o.loaded.includes(o.wanted) ? 'Ready' : 'Running');
+  $('sOllamaSub').textContent = `Offline brain · ${o.wanted}`;
+  setStatus($('sOffline'), s.offline_ready, s.offline_ready ? 'Loaded' : (srv.running ? 'Loading…' : 'Not loaded'));
+
+  if (st) { setSeg('segExpr', st.expression === 'GREET' ? 'HAPPY' : st.expression); setSeg('segTheme', st.theme); }
+  $('swOutage').disabled = !s.debug || !srv.running;
+  $('outageSub').textContent = s.debug ? 'Cuts Gemini so you can watch Cyno fall back.' : 'Turn on Debug tools in Settings, then restart.';
+}
+
+async function poll() {
+  const s = await call('get_status');
+  if (s) render(s);
+  setTimeout(poll, 1000);
+}
+
+$('btnStart').addEventListener('click', async () => { await call('start_server'); toast('Starting Cyno…'); });
+$('btnStop').addEventListener('click', async () => { await call('stop_server'); toast('Cyno stopped'); });
+$('btnRestart').addEventListener('click', async () => { toast('Restarting…'); await call('restart_server'); });
+
+// ---------- controls ----------
+document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', async () => {
+  if (!lastStatus || !lastStatus.server.running) return toast('Start Cyno first');
+  await call('open_display', b.dataset.open);
+}));
+$('segExpr').addEventListener('click', async (e) => {
+  const v = e.target.dataset.v; if (!v) return;
+  if (!lastStatus || !lastStatus.server.running) return toast('Start Cyno first');
+  setSeg('segExpr', v); await call('set_state', { expression: v });
+});
+$('segTheme').addEventListener('click', async (e) => {
+  const v = e.target.dataset.v; if (!v) return;
+  if (!lastStatus || !lastStatus.server.running) return toast('Start Cyno first');
+  setSeg('segTheme', v); await call('set_state', { theme: v });
+});
+// ---------- knowledge ----------
+let facts = [], editingId = null;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let asst = null;
+async function loadKnowledge() {
+  const a = await call('get_assistant');
+  if (a) {
+    asst = a;
+    $('fInstructions').value = a.instructions || '';
+    $('fGreeting').value = a.greeting || '';
+    $('fGreeting').placeholder = a.default_greeting;
+    $('swStrict').checked = a.strict !== false;
+    $('swOnTopic').checked = !!a.on_topic;
+  }
+  const k = await call('get_knowledge'); if (!k) return;
+  facts = k.entries;
+  const unverified = facts.filter(f => f.verified === false).length;
+  $('factCount').textContent = `· ${facts.length}${unverified ? ` · ${unverified} to check` : ''}`;
+  // Unconfirmed facts first so they get noticed.
+  const sorted = [...facts].sort((x, y) => (x.verified === false ? 0 : 1) - (y.verified === false ? 0 : 1));
+  $('factList').innerHTML = sorted.length ? sorted.map(f => `
+    <div class="row tap" data-id="${esc(f.id)}">
+      <div class="row-main"><div class="row-title">${esc(f.title)}</div><div class="fact-answer">${esc(f.answer)}</div></div>
+      ${f.verified === false ? '<span class="chip">Needs checking</span>' : ''}
+      <span class="chevron">›</span>
+    </div>`).join('') : '<div class="empty">No facts yet. Add the first one.</div>';
+}
+$('factList').addEventListener('click', (e) => {
+  const row = e.target.closest('[data-id]'); if (row) openFact(facts.find(f => f.id === row.dataset.id));
+});
+
+function openFact(f) {
+  editingId = f ? f.id : null;
+  $('factTitleHead').textContent = f ? 'Edit fact' : 'New fact';
+  $('fFactTitle').value = f ? f.title : '';
+  $('fFactAnswer').value = f ? f.answer : '';
+  $('fFactKeywords').value = f ? (f.keywords || []).join(', ') : '';
+  $('fFactSource').value = f ? (f.source || '') : '';
+  $('fFactVerified').checked = f ? f.verified !== false : true;
+  $('btnDeleteFact').style.visibility = f ? 'visible' : 'hidden';
+  $('overlapWarn').classList.remove('show');
+  if (f) checkOverlaps();
+  delete $('btnDeleteFact').dataset.armed; $('btnDeleteFact').textContent = 'Delete';
+  $('factScrim').classList.add('show');
+  setTimeout(() => $('fFactTitle').focus(), 50);
+}
+function closeFact() { $('factScrim').classList.remove('show'); }
+$('btnAddFact').addEventListener('click', () => openFact(null));
+$('btnCancelFact').addEventListener('click', closeFact);
+$('factScrim').addEventListener('click', (e) => { if (e.target === $('factScrim')) closeFact(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFact(); });
+$('fFactTitle').addEventListener('blur', async () => {
+  if ($('fFactKeywords').value.trim() || !$('fFactTitle').value.trim()) return;
+  const r = await call('suggest_keywords', $('fFactTitle').value);
+  if (r && !$('fFactKeywords').value.trim()) $('fFactKeywords').placeholder = r.keywords.join(', ') || 'library, books';
+});
+$('btnSaveFact').addEventListener('click', async () => {
+  const r = await call('save_fact', {
+    id: editingId, title: $('fFactTitle').value, answer: $('fFactAnswer').value,
+    keywords: $('fFactKeywords').value, source: $('fFactSource').value, verified: $('fFactVerified').checked,
+  });
+  if (!r || r.ok === false) return;
+  closeFact(); await loadKnowledge(); toast(editingId ? 'Fact updated' : 'Fact added');
+});
+// Two-step delete inside the sheet (native web views may block confirm() dialogs).
+$('btnDeleteFact').addEventListener('click', async () => {
+  if (!editingId) return;
+  const b = $('btnDeleteFact');
+  if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to delete'; return; }
+  await call('delete_fact', editingId); closeFact(); await loadKnowledge(); toast('Fact deleted');
+});
+$('btnSaveInstr').addEventListener('click', async () => {
+  const r = await call('save_assistant', $('fGreeting').value, $('fInstructions').value, $('swStrict').checked, $('swOnTopic').checked);
+  if (r && r.ok) { await loadKnowledge(); toast('Saved. Cyno uses it from the next conversation.'); }
+});
+// Rule switches save at once, using the last *saved* text (unsaved edits in the boxes stay unsaved).
+['swStrict', 'swOnTopic'].forEach(id => $(id).addEventListener('change', async () => {
+  if (!asst) return;
+  const r = await call('save_assistant', asst.greeting, asst.instructions, $('swStrict').checked, $('swOnTopic').checked);
+  if (r && r.ok) {
+    asst.strict = $('swStrict').checked; asst.on_topic = $('swOnTopic').checked;
+    toast(id === 'swStrict'
+      ? ($('swStrict').checked ? 'Strict answers on: only confirmed facts' : 'Strict answers off: unconfirmed facts can be used')
+      : ($('swOnTopic').checked ? 'Cyno will stay on IIT topics' : 'Cyno can chat about other topics'));
+    if ($('fTry').value.trim()) tryQuestion();
+  }
+}));
+
+// Warn when a fact shares keywords with others: that's where answers can contradict.
+async function checkOverlaps() {
+  const title = $('fFactTitle').value.trim(); if (!title) { $('overlapWarn').classList.remove('show'); return; }
+  const r = await call('check_overlaps', { id: editingId, title, keywords: $('fFactKeywords').value });
+  const titles = (r && r.titles) || [];
+  $('overlapWarn').textContent = titles.length
+    ? `Similar to: ${titles.join(', ')}. Make sure these facts don't say different things, or Cyno may get confused.`
+    : '';
+  $('overlapWarn').classList.toggle('show', titles.length > 0);
+}
+$('fFactTitle').addEventListener('change', checkOverlaps);
+$('fFactKeywords').addEventListener('change', checkOverlaps);
+
+async function tryQuestion() {
+  const q = $('fTry').value.trim(); if (!q) return;
+  const r = await call('test_question', q); if (!r) return;
+  let html = r.results.length
+    ? r.results.map((x, i) => `<div class="result"><div class="row-title">${i === 0 ? 'Cyno would answer from ' : 'Also matches '}<b>${esc(x.title)}</b></div><div class="row-sub">${esc(x.answer)}</div></div>`).join('')
+    : '<div class="empty">No confirmed fact matches. Cyno will say it isn’t sure and suggest the front desk.</div>';
+  if (r.tie) html += '<div class="result"><div class="row-sub">Two facts match equally well, so Cyno will ask which one the visitor means, or say it isn’t sure.</div></div>';
+  if (r.hidden_unconfirmed && r.hidden_unconfirmed.length) html += `<div class="result"><div class="row-sub">Not used because they still need checking: ${r.hidden_unconfirmed.map(esc).join(', ')}. Confirm them, or turn off Strict answers.</div></div>`;
+  $('tryResults').innerHTML = html;
+}
+$('btnTry').addEventListener('click', tryQuestion);
+$('fTry').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryQuestion(); });
+$('btnOllama').addEventListener('click', async () => { const r = await call('start_ollama'); if (r && r.ok) toast('Ollama starting'); });
+$('btnBench').addEventListener('click', async () => {
+  await call('run_benchmark'); $('btnBench').disabled = true; $('btnBench').textContent = 'Running…';
+  const tick = async () => {
+    const b = await call('get_benchmark'); if (!b) return;
+    $('benchOut').textContent = b.lines.join('\n');
+    if (b.running) setTimeout(tick, 1000); else { $('btnBench').disabled = false; $('btnBench').textContent = 'Run again'; }
+  };
+  tick();
+});
+$('swOutage').addEventListener('change', async (e) => {
+  const r = await call('simulate_outage', e.target.checked);
+  if (!r || r.ok === false) e.target.checked = false;
+  else toast(e.target.checked ? 'Gemini cut. Watch Cyno switch to offline.' : 'Gemini restored for new conversations');
+});
+
+// ---------- settings ----------
+function fillSelect(sel, options, value, fallback) {
+  const opts = [...new Set([...(options || []), value || fallback].filter(Boolean))];
+  sel.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+  sel.value = value || fallback;
+}
+async function loadSettings() {
+  settings = await call('get_settings'); if (!settings) return;
+  const v = settings.values, d = settings.defaults;
+  document.querySelectorAll('[data-key]').forEach(el => {
+    const k = el.dataset.key;
+    if (el.type === 'checkbox') el.checked = v[k] === '1';
+    else if (el.tagName === 'SELECT') fillSelect(el, settings.options[k], v[k], d[k]);
+    else el.value = v[k] || '';
+  });
+  $('fKey').value = '';
+  $('fKey').placeholder = settings.api_key.set ? `Saved key ${settings.api_key.hint}` : 'Paste your key';
+}
+$('btnShowKey').addEventListener('click', () => {
+  const f = $('fKey'); const hidden = f.type === 'password';
+  f.type = hidden ? 'text' : 'password'; $('btnShowKey').textContent = hidden ? 'Hide' : 'Show';
+});
+$('keyLink').addEventListener('click', () => call('open_url', 'https://aistudio.google.com/apikey'));
+$('btnRevert').addEventListener('click', () => { loadSettings(); toast('Reverted'); });
+$('btnSave').addEventListener('click', async () => {
+  const values = {};
+  document.querySelectorAll('[data-key]').forEach(el => {
+    const k = el.dataset.key, d = settings.defaults[k];
+    let val = el.type === 'checkbox' ? (el.checked ? '1' : '') : el.value.trim();
+    if (val === d) val = '';  // keep .env minimal: defaults stay commented out
+    values[k] = val;
+  });
+  const r = await call('save_settings', values, $('fKey').value.trim() || null, false);
+  if (!r || r.ok === false) return;
+  $('fKey').value = '';
+  await loadSettings();
+  toast('Settings saved');
+  $('restartBanner').classList.toggle('show', r.restart_needed);
+});
+$('btnBannerRestart').addEventListener('click', async () => {
+  $('restartBanner').classList.remove('show');
+  if (lastStatus && lastStatus.server.owned) { toast('Restarting…'); await call('restart_server'); }
+  else toast('Cyno was started outside this app. Restart it there.');
+});
+
+// ---------- activity ----------
+let logSince = 0, logFilter = 'all';
+const isProblem = (l) => /ERROR|WARNING|Traceback|exited|Exception/.test(l);
+function appendLines(lines) {
+  const box = $('log'); const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const frag = document.createDocumentFragment();
+  lines.forEach(l => {
+    if (logFilter === 'err' && !isProblem(l)) return;
+    const div = document.createElement('div'); div.textContent = l; if (isProblem(l)) div.className = 'err'; frag.appendChild(div);
+  });
+  box.appendChild(frag);
+  while (box.childNodes.length > 1500) box.removeChild(box.firstChild);
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+async function pollLogs() {
+  const r = await call('get_logs', logSince, $('swDebugLines').checked);
+  if (r) { if (r.lines.length) appendLines(r.lines); logSince = r.last; }
+  setTimeout(pollLogs, 1000);
+}
+async function reloadLogs() { $('log').innerHTML = ''; logSince = 0; }
+$('segLog').addEventListener('click', (e) => { const v = e.target.dataset.v; if (!v) return; logFilter = v; setSeg('segLog', v); reloadLogs(); });
+$('swDebugLines').addEventListener('change', reloadLogs);
+$('btnClearLog').addEventListener('click', async () => { await call('clear_logs'); reloadLogs(); });
+
+// ---------- boot ----------
+// ---------- appearance ----------
+function applyTheme(v) {
+  if (v === 'light' || v === 'dark') document.documentElement.dataset.theme = v;
+  else delete document.documentElement.dataset.theme;
+  setSeg('segTheme2', v || 'auto');
+}
+$('segTheme2').addEventListener('click', async (e) => {
+  const v = e.target.dataset.v; if (!v) return;
+  applyTheme(v); await call('set_prefs', { appearance: v });
+});
+applyTheme('auto');
+
+window.addEventListener('pywebviewready', async () => {
+  api = window.pywebview.api;
+  const prefs = await call('get_prefs'); if (prefs) applyTheme(prefs.appearance);
+  poll(); pollLogs();
+});
+</script>
+</body>
+</html>
