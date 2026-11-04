@@ -10,13 +10,12 @@
         "history",
         "founded",
         "founder",
-        "institute",
-        "who",
-        "what is"
+        "institute"
       ],
       "answer": "The Informatics Institute of Technology was founded in Colombo in 1990 by Dr. Gamini Wickramasinghe, starting as the Informatics Institute of Computer Studies with 22 students and 6 lecturers. It offers IT, business and innovation education, and was the first private institute in Sri Lanka to offer British degrees.",
       "source": "https://www.iit.ac.lk/about/",
-      "verified": true
+      "verified": true,
+      "image": "iit-building.jpg"
     },
     {
       "id": "partners",
@@ -35,7 +34,8 @@
       ],
       "answer": "IIT's undergraduate degrees in Business and Information Technology are offered in partnership with the University of Westminster and Robert Gordon University in the UK. Other academic partners include the University of Hertfordshire, Macquarie University and Western Sydney University.",
       "source": "https://www.iit.ac.lk/course/ ; https://www.iit.ac.lk/about/",
-      "verified": true
+      "verified": true,
+      "image": "partner-university-logos.jpg"
     },
     {
       "id": "contact",
@@ -66,11 +66,19 @@
         "ramakrishna",
         "galle road",
         "branch",
-        "branches"
+        "branches",
+        "map",
+        "directions",
+        "how do i get",
+        "find you",
+        "get there",
+        "located"
       ],
       "answer": "The Main Campus is at 57 Ramakrishna Road, Colombo 6. The City Campus is at 435 Galle Road, Colombo 3. The School of Computing is at 10 Trelawney Place, Colombo 4, and the Business School is at 528 R. A. De Mel Mawatha, Colombo 3.",
       "source": "https://www.iit.ac.lk/contact/",
-      "verified": true
+      "verified": true,
+      "image": "main-campus-map.png",
+      "link": "https://share.google/vZePXnL0vinl5xg7s"
     },
     {
       "id": "regional",
@@ -86,7 +94,8 @@
       ],
       "answer": "IIT has a regional centre in Galle at 36 Colombo Road, Kaluwella, phone +94 76 256 2563, and one in Kurunegala at 109 Bauddhaloka Mawatha, phone +94 744 430 060.",
       "source": "https://www.iit.ac.lk/contact/",
-      "verified": true
+      "verified": true,
+      "image": "galle-and-kurunegala-centres.jpg"
     },
     {
       "id": "admission_process",
@@ -133,7 +142,8 @@
       ],
       "answer": "Undergraduate degrees include Computer Science, Software Engineering, Artificial Intelligence and Data Science, Artificial Intelligence, AI and Data Engineering, Business Computing, Business Data Analytics, Fintech with Data Analytics, Business Management, and a Bachelor of Business Administration.",
       "source": "https://www.iit.ac.lk/course/",
-      "verified": true
+      "verified": true,
+      "image": "iit-graduation.jpg"
     },
     {
       "id": "postgraduate",
@@ -144,11 +154,16 @@
         "master",
         "msc",
         "ma",
-        "pg"
+        "pg",
+        "postgraduate courses",
+        "postgraduate programmes",
+        "masters degree",
+        "post graduate"
       ],
       "answer": "Postgraduate programmes include MSc AI Engineering, Applied Artificial Intelligence, Business Analytics, Information Technology, Big Data Analytics, Cyber Security and Forensics, Advanced Software Engineering, and an MA in Fashion Business Management.",
       "source": "https://www.iit.ac.lk/course/",
-      "verified": true
+      "verified": true,
+      "image": "iit-graduates.jpg"
     },
     {
       "id": "foundation",
@@ -163,7 +178,8 @@
       ],
       "answer": "The IIT International Foundation offers UK accredited diplomas in Business Technology, Computing, and Business Management.",
       "source": "https://www.iit.ac.lk/course/",
-      "verified": true
+      "verified": true,
+      "image": "foundation-batch-september-2026.jpg"
     },
     {
       "id": "facilities",
@@ -183,7 +199,8 @@
       ],
       "answer": "IIT has air-conditioned classrooms, a student lounge, a library with over 10,000 books, a cafeteria, an on-campus swimming pool and sports facilities.",
       "source": "https://www.iit.ac.lk/student-life/facilities/",
-      "verified": true
+      "verified": true,
+      "image": "iit-library.jpg"
     },
     {
       "id": "admissions_office_location",
@@ -209,6 +226,103 @@
       "answer": "The Main Auditorium is on the 5th Floor at GP Square Building",
       "source": "SAMPLE from controls.html demo",
       "verified": false
+    },
+    {
+      "id": "deans",
+      "title": "Deans and heads",
+      "keywords": [
+        "dean",
+        "deans",
+        "head of department",
+        "hod",
+        "faculty head",
+        "academic head",
+        "school of computing",
+        "business school",
+        "faculty",
+        "computing faculty",
+        "business faculty"
+      ],
+      "answer": "The Dean (Academic) is Ruvan Weerasinghe. Dr. Dilhari Attygalle is the Dean of the School of Computing, and Prof. P.S.M. Gunaratne is the Dean of the IIT Business School. Prof. Nihal Kodikara is Head of Department at the IIT School of Computing.",
+      "source": "https://www.iit.ac.lk/faculty/computing/ and https://www.iit.ac.lk/faculty/business/",
+      "verified": true,
+      "image": "iit-deans-and-heads.jpg"
+    },
+    {
+      "id": "cynobot",
+      "title": "About Cynobot",
+      "keywords": [
+        "cynobot",
+        "cyno bot",
+        "who are you",
+        "your name",
+        "who made you",
+        "who built you",
+        "made you",
+        "built you",
+        "are you a robot"
+      ],
+      "answer": "I'm Cynobot, Cynocor's first human-sized AI assistant robot, working here as IIT's robot receptionist. I was built by Cynocor, a startup our team started to build projects like me.",
+      "source": "https://cynocor.com.lk (and the Cynocor team)",
+      "verified": true,
+      "image": "cynocor-logo.png",
+      "link": "https://cynocor.com.lk"
+    },
+    {
+      "id": "cynocor",
+      "title": "About Cynocor",
+      "keywords": [
+        "cynocor",
+        "startup",
+        "your company",
+        "cynocor website",
+        "what is cynocor",
+        "cynocor services",
+        "sinocor",
+        "sino core",
+        "cyno core",
+        "psycho core",
+        "synecdoche",
+        "synechdoche"
+      ],
+      "answer": "Cynocor is a startup that builds software, automation, AI and IoT systems, from web and mobile platforms to AI workflows. Its mission is to architect and deploy advanced systems that let clients scale without friction. You can find it at cynocor.com.lk.",
+      "source": "https://cynocor.com.lk and https://cynocor.com.lk/about.html",
+      "verified": true,
+      "image": "cynocor-logo.png",
+      "link": "https://cynocor.com.lk"
+    },
+    {
+      "id": "cynocor_team",
+      "title": "Cynocor team",
+      "keywords": [
+        "cynocor team",
+        "team members",
+        "your team",
+        "who is in the team",
+        "developers",
+        "your creators",
+        "team behind you"
+      ],
+      "answer": "The Cynocor team is Chanul Dilhara, who leads product direction and technical architecture; Ravindu Umapathi, business development and strategy; Chamupathi Dewdunu, systems engineering and cloud infrastructure; Amanya Rubasinghe, product experience and UI design; Thejana Thathsara, cybersecurity; and Ashendra Liyanage, quality assurance and testing.",
+      "source": "https://cynocor.com.lk/team.html",
+      "verified": true
+    },
+    {
+      "id": "cynocor_contact",
+      "title": "Contact Cynocor",
+      "keywords": [
+        "contact cynocor",
+        "cynocor contact",
+        "cynocor email",
+        "cynocor phone",
+        "cynocor number",
+        "cynocor whatsapp",
+        "reach cynocor"
+      ],
+      "answer": "You can reach Cynocor at cynocorofficial@gmail.com or call +94 74 232 1760, which is also on WhatsApp. The website is cynocor.com.lk.",
+      "source": "https://cynocor.com.lk/contact.html",
+      "verified": true,
+      "link": "https://cynocor.com.lk/contact.html"
     }
   ]
 }

@@ -84,20 +84,34 @@ when the network is gone.
 
 ## Edit what Cyno knows
 
-`data/knowledge.json` is re-read on every online question; offline mode reads it when each session starts.
-Website facts came from iit.ac.lk (each entry has its `source`). Entries with `"verified": false`
-are in-building directions copied from the old demo. Confirm them before the demo.
+`data/knowledge.json` is read when each conversation starts: both brains get every confirmed fact in
+their instructions. Website facts came from iit.ac.lk (each entry has its `source`). Entries with
+`"verified": false` are in-building directions copied from the old demo. Confirm them before the demo.
+
+**Chest screen visuals.** A fact can also have a **picture** (a file in `data/media/`, shown across the
+chest card) and a **link** (shown as a QR code visitors scan with their phone). Set both in Cyno Control
+when editing a fact. The "IIT campuses" fact shows `data/media/main-campus-map.png` (map data
+© OpenStreetMap contributors) and a QR code for directions.
+
+**Greeting.** Online, Cyno records its greeting once in the Gemini voice (`data/greeting_cache/`) and
+plays that recording to each visitor, because Gemini Live often went silent when asked to greet on its
+own. Changing the greeting, voice or model records a new one.
+
+**Visitor left.** If nobody speaks for `CYNO_IDLE_SECS` seconds after Cyno's last words, Cyno hangs up,
+clears the chest screen and shows "Tap to talk" again.
 
 ## Settings (.env)
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `GEMINI_VOICE` | Aoede | Online voice: Puck, Charon, Kore, Fenrir, Aoede |
+| `GEMINI_MODEL` | models/gemini-3.1-flash-live-preview | Online brain. In tests `gemini-3.8-live` often sent an answer's words without its sound; 3.1 Flash spoke every answer |
 | `CYNO_LANGUAGES` | en-US | Languages the speech input is hinted to |
-| `OLLAMA_MODEL` | llama3.2:3b | Offline brain (`llama3.2:1b` is faster, less smart) |
+| `OLLAMA_MODEL` | llama3.2:3b | Offline brain, ~2.6 GB RAM |
 | `WHISPER_MODEL` | small.en | Offline ears (`base.en` is faster, less accurate) |
 | `KOKORO_VOICE` | af_heart | Offline voice |
 | `KOKORO_THREADS` | cores ÷ 3 | CPU threads for the offline voice |
+| `CYNO_IDLE_SECS` | 40 | Seconds of silence before Cyno returns to idle (`0` = never) |
 | `CYNO_FORCE_OFFLINE` | (unset) | `1` = always use offline mode |
 
 ## Operator override

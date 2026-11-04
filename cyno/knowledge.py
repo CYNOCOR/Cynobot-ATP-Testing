@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 KB_PATH = Path(__file__).resolve().parent.parent / "data" / "knowledge.json"
+MEDIA_DIR = KB_PATH.parent / "media"  # pictures shown on the chest card (served at /media/)
 
 
 def _load() -> list[dict]:
@@ -91,6 +92,15 @@ def upsert(entry: dict) -> dict:
         "source": (entry.get("source") or "Added in Cyno Control").strip(),
         "verified": bool(entry.get("verified", True)),
     }
+    # Optional chest visuals: a picture from data/media and a link shown as a QR code.
+    image = (entry.get("image") or "").strip()
+    link = (entry.get("link") or "").strip()
+    if image:
+        stored["image"] = Path(image).name
+    if link:
+        if not re.match(r"https?://", link):
+            raise ValueError("The QR code link must start with http:// or https://")
+        stored["link"] = link
     for i, e in enumerate(entries):
         if e["id"] == entry_id:
             entries[i] = stored
@@ -111,4 +121,34 @@ def topics() -> list[str]:
 
 def as_prompt(confirmed_only: bool = False) -> str:
     """The whole KB as plain text, for the offline model's system prompt (small KB, no tool calls)."""
-    return "\n".join(f"- {e['title']}: {e['answer']}" for e in _entries(confirmed_only))
+    entries = _entries(confirmed_only)
+    facts = "\n".join(f"- {e['title']}: {e['answer']}" for e in entries)
+    screen = "\n".join(f"- {e['title']}: {_visual_note(e)}" for e in entries if _visual_note(e))
+    if screen:
+        facts += "\n\nWhat your chest screen shows with each fact (never read this list aloud):\n" + screen
+    return facts
+
+
+def _visual_note(entry: dict) -> str:
+    """Tell the model what the chest shows with this fact, so it can say so instead of 'ask the front desk'."""
+    parts = []
+    if entry.get("image") and (MEDIA_DIR / entry["image"]).is_file():
+        parts.append("picture of " + Path(entry["image"]).stem.replace("-", " ").replace("_", " "))
+    if entry.get("link"):
+        parts.append("QR code visitors can scan")
+    return ", ".join(parts)
+
+
+def card(entry: dict) -> dict:
+    """What the chest display shows for a fact."""
+    out = {"title": entry["title"], "body": entry["answer"]}
+    if entry.get("image") and (MEDIA_DIR / entry["image"]).is_file():
+        out["image"] = f"/media/{entry['image']}"
+    if entry.get("link"):
+        out["link"] = entry["link"]
+    return out
+
+
+def media_files() -> list[str]:
+    exts = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+    return sorted(p.name for p in MEDIA_DIR.glob("*") if p.suffix.lower() in exts) if MEDIA_DIR.is_dir() else []

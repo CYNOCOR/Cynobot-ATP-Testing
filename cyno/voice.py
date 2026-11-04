@@ -1,7 +1,7 @@
 """Voice pipeline: browser mic (WebRTC) -> speech AI -> browser speaker.
 
 Two interchangeable brains, picked per session:
-  ONLINE   Gemini Live (speech-to-speech, natural voice, campus info via tool call)
+  ONLINE   Gemini Live (speech-to-speech, natural voice)
   OFFLINE  Whisper (STT) -> Ollama (LLM) -> Kokoro (TTS), all on the laptop
 
 Pipeline events are mirrored onto the StateBus so the face and chest displays
@@ -10,17 +10,16 @@ show THINKING / SPEAKING / captions in sync with the audio.
 
 import asyncio
 import os
+import re
 
 from loguru import logger
 
-from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
-from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
-    FunctionCallInProgressFrame,
     InterruptionFrame,
     LLMRunFrame,
+    SpeechOutputAudioRawFrame,
     TranscriptionFrame,
     TTSTextFrame,
 )
@@ -33,19 +32,21 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.services.google.gemini_live.llm import ContextWindowCompressionParams, GeminiLiveLLMService
-from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
-from cyno import assistant, knowledge, offline_models
-from cyno.bus import StateBus
+from cyno import assistant, greeting, knowledge, offline_models
+from cyno.bus import DEFAULT_STATE, StateBus
 from cyno.stats import stats
 
 PERSONA = """
-You are Cyno, the robot receptionist at the entrance of the Informatics Institute
-of Technology (IIT). You were built by Team Cynocor.
+Your name is Cynobot; never shorten it to Cyno. You are the robot receptionist at the
+entrance of the Informatics Institute of Technology (IIT). You were built by Cynocor, the
+team's own startup.
+Pronunciation: say Cynobot as "Sigh-no-bot" and Cynocor as "Sigh-no-core". Visitors' speech
+may be transcribed as "Sinocor", "Cyno core", "Psycho core" or "Synecdoche"; they mean Cynocor.
 
 How you speak:
 - Always reply in English, even if the visitor speaks Sinhala, Tamil or another
@@ -57,19 +58,20 @@ How you speak:
 - Do not give medical, legal or emergency decisions; direct people to staff.
 """
 
-ONLINE_RULES = """
-What you know:
-- For ANY question about IIT (places, offices, directions, courses, admissions,
-  contacts, facilities), call lookup_campus_info first and answer only from its result.
-- If the tool finds nothing, say you are not sure and suggest asking the staff at
-  the front desk. Never invent rooms, names, times or phone numbers.
-"""
-
-OFFLINE_RULES = """
+# Both brains get every confirmed fact in their instructions. Online used to look facts
+# up with a tool call, but Gemini Live sometimes stayed silent after the tool result:
+# the card appeared on the chest and nothing was spoken.
+FACT_RULES = """
 Keep every reply to one or two short sentences.
-Answer questions about IIT ONLY from the facts below. If the answer is not in the
-facts, say you are not sure and suggest asking the staff at the front desk. Never
-invent rooms, names, times or phone numbers.
+Answer questions about IIT, Cynobot and Cynocor ONLY from the facts below. If the answer
+is not in the facts, say you are not sure and suggest asking the staff at the front desk.
+Never invent rooms, names, times or phone numbers.
+Your chest screen shows the matching fact while you talk; the list after the facts says which
+facts come with a picture or QR code. When a visitor asks to see a map, picture or QR code that
+a fact has, tell them it is on your chest screen (for example, "Here's the map on my screen,
+and you can scan the code for directions"). Do not send them to the front desk for it.
+That list is a note for you: never read it, its brackets or its wording aloud.
+Do not end every reply with "Is there anything else I can help you with?"; ask it rarely.
 
 Facts:
 {facts}
@@ -146,17 +148,29 @@ async def simulate_outage(blocked: bool):
                 await llm._session.close()
 
 
+# How speech recognition spelled "Cynocor" in tests: cynochar, signocker, Cynocker, sinocor,
+# cyno core, psycho core... (first half "sigh-no", second half "core").
+CYNOCOR_SOUNDALIKE = re.compile(
+    r"\b(?:cyno|sino|sinno|signo|syno|sygno|psycho|cino|saino|sai no)[\s-]?(?:core?|cor|car|char|chor|cker|ker|ckar|kor)\b", re.I
+)
+
+
 class DisplayObserver(BaseObserver):
     """Turns pipeline frames into face/chest display state."""
 
-    def __init__(self, bus: StateBus, cards_from_transcript: bool):
+    def __init__(self, bus: StateBus):
         super().__init__()
         self._bus = bus
-        self._cards_from_transcript = cards_from_transcript  # offline: no tool call shows cards
+        self._card_id = None  # fact shown for the current visitor turn
         self._bot_text = ""
         self._user_text = ""
         self._new_bot_turn = True
         self._new_user_turn = True
+        self.bot_speaking = False
+        self.last_activity = asyncio.get_running_loop().time()  # visitor or Cyno talking
+
+    def _touch(self):
+        self.last_activity = asyncio.get_running_loop().time()
 
     async def on_push_frame(self, data: FramePushed):
         if not data.first_push:
@@ -164,21 +178,26 @@ class DisplayObserver(BaseObserver):
         frame = data.frame
 
         if isinstance(frame, TranscriptionFrame):
+            self._touch()
             stats.heard()
             if self._new_user_turn:
                 self._user_text = ""
+                self._card_id = None
                 self._new_user_turn = False
             self._user_text = f"{self._user_text} {frame.text}".strip()
             self._new_bot_turn = True
             changes = {"expression": "THINKING", "flow_step": "CONVERSE", "user_text": self._user_text}
-            if self._cards_from_transcript:
-                hits = knowledge.search(self._user_text, limit=1, confirmed_only=assistant.load()["strict"])
-                if hits:
-                    changes["card"] = {"title": hits[0]["title"], "body": hits[0]["answer"]}
+            # Match the visitor's latest question (two can merge into one turn when Cyno didn't
+            # answer in between). No match clears the card, so an old picture never lingers.
+            heard = CYNOCOR_SOUNDALIKE.sub("Cynocor", self._user_text)
+            sentences = [s for s in re.split(r"(?<=[.?!])\s+", heard) if s.strip()]
+            hits = knowledge.search(sentences[-1] if sentences else self._user_text, limit=1,
+                                    confirmed_only=assistant.load()["strict"])
+            changes["card"] = knowledge.card(hits[0]) if hits else None
+            if hits and self._card_id is None:
+                stats.kb_lookups += 1  # once per visitor turn that matched a fact
+            self._card_id = hits[0]["id"] if hits else None
             await self._bus.update(**changes)
-
-        elif isinstance(frame, FunctionCallInProgressFrame):
-            await self._bus.update(expression="THINKING")
 
         elif isinstance(frame, TTSTextFrame):
             if self._new_bot_turn:
@@ -189,11 +208,15 @@ class DisplayObserver(BaseObserver):
             await self._bus.update(last_spoken_text=self._bot_text.strip())
 
         elif isinstance(frame, BotStartedSpeakingFrame):
+            self.bot_speaking = True
+            self._touch()
             stats.bot_started()
             self._new_user_turn = True
             await self._bus.update(expression="SPEAKING", flow_step="CONVERSE")
 
         elif isinstance(frame, BotStoppedSpeakingFrame):
+            self.bot_speaking = False
+            self._touch()
             self._new_bot_turn = True
             await self._bus.update(expression="IDLE")
 
@@ -203,49 +226,13 @@ class DisplayObserver(BaseObserver):
             await self._bus.update(expression="IDLE")
 
 
-def _build_online(transport, bus: StateBus):
-    async def lookup_campus_info(params: FunctionCallParams):
-        query = params.arguments.get("query", "")
-        strict = assistant.load()["strict"]
-        scored = knowledge.search_scored(query, confirmed_only=strict)  # strict: unconfirmed facts are never used
-        results = [e for _, e in scored]
-        logger.info(f"KB lookup '{query}' -> {[r['id'] for r in results]}")
-        stats.kb_lookups += 1
-        if results:
-            top = results[0]
-            await bus.update(card={"title": top["title"], "body": top["answer"]})
-            reply = {"found": True, "results": [{"title": r["title"], "answer": r["answer"]} for r in results]}
-            if len(scored) > 1 and scored[0][0] == scored[1][0]:
-                # Equally good matches: the question is ambiguous or the facts may disagree.
-                reply["note"] = (
-                    "Several facts match equally. Only answer if one clearly answers the question; "
-                    "otherwise ask which one the visitor means, or say you're not sure."
-                )
-            await params.result_callback(reply)
-        else:
-            await params.result_callback(
-                {
-                    "found": False,
-                    "instruction": "No confirmed information. Tell the visitor you're not sure and suggest the front desk. Do not guess.",
-                }
-            )
+def _facts_prompt() -> str:
+    return PERSONA + FACT_RULES.format(facts=knowledge.as_prompt(confirmed_only=assistant.load()["strict"])) + assistant.instructions_block()
 
-    tools = ToolsSchema(
-        standard_tools=[
-            FunctionSchema(
-                name="lookup_campus_info",
-                description="Search the official IIT knowledge base for locations, offices, directions, courses, admissions, contacts and facilities.",
-                properties={
-                    "query": {"type": "string", "description": "What the visitor is asking about, e.g. 'admissions office'."}
-                },
-                required=["query"],
-                handler=lookup_campus_info,
-            )
-        ]
-    )
 
+def _build_online(transport, recorded_greeting: bool):
     settings = EnglishGeminiLive.Settings(
-        system_instruction=PERSONA + ONLINE_RULES + assistant.instructions_block(),
+        system_instruction=_facts_prompt(),
         voice=os.getenv("GEMINI_VOICE", "Aoede"),
         # Without compression Google ends audio sessions after 15 min, which would drop a
         # kiosk that sits connected all day into offline mode. With it, the oldest turns are
@@ -253,9 +240,14 @@ def _build_online(transport, bus: StateBus):
         context_window_compression=ContextWindowCompressionParams(enabled=True),
         temperature=assistant.temperature(),
     )
-    if os.getenv("GEMINI_MODEL"):
-        settings.model = os.environ["GEMINI_MODEL"]
-    llm = EnglishGeminiLive(api_key=os.environ["GOOGLE_API_KEY"], settings=settings, tools=tools)
+    # 3.1 Flash Live spoke 6 of 6 test answers in full; 3.8 Live and 2.5 native audio each sent
+    # the words of 3 answers with little or no sound (the "shows the answer but doesn't speak" bug).
+    settings.model = os.getenv("GEMINI_MODEL") or greeting.DEFAULT_MODEL
+    # With a recorded greeting, the opening context only tells Gemini what was already said;
+    # it must not answer it.
+    llm = EnglishGeminiLive(
+        api_key=os.environ["GOOGLE_API_KEY"], settings=settings, inference_on_context_initialization=not recorded_greeting
+    )
 
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
@@ -276,6 +268,22 @@ async def _watch_gemini(llm: EnglishGeminiLive, runner: WorkerRunner, grace_secs
         if loop_time - down_since >= grace_secs:
             logger.error(f"Gemini unreachable for {grace_secs:.0f}s, ending session to fall back offline")
             stats.fallbacks += 1
+            await runner.cancel()
+            return
+
+
+async def _watch_idle(observer: DisplayObserver, runner: WorkerRunner, bus: StateBus):
+    """The visitor walked away: nobody has spoken for CYNO_IDLE_SECS after Cyno's last words."""
+    idle_secs = float(os.getenv("CYNO_IDLE_SECS") or 40)
+    if idle_secs <= 0:
+        return
+    loop = asyncio.get_running_loop()
+    while True:
+        await asyncio.sleep(1)
+        if not observer.bot_speaking and loop.time() - observer.last_activity >= idle_secs:
+            logger.info(f"No one spoke for {idle_secs:.0f}s, returning to idle")
+            stats.idle_ends += 1
+            await bus.update(session_end="idle")  # tells the chest page not to reconnect
             await runner.cancel()
             return
 
@@ -302,13 +310,23 @@ def _build_offline(transport):
             model=offline_models.ollama_model_name(),
             max_tokens=90,  # keep spoken answers short; long ones are slow on a CPU-only laptop
             temperature=assistant.temperature(),
-            system_instruction=PERSONA + OFFLINE_RULES.format(facts=knowledge.as_prompt(confirmed_only=assistant.load()["strict"])) + assistant.instructions_block(),
+            system_instruction=_facts_prompt(),
         ),
     )
-    tts = KokoroTTSService(
+    class SpokenNamesKokoro(KokoroTTSService):
+        """Kokoro reads "Cynocor" as "Sin-o-cor"; spell the names the way they are said.
+        Captions keep the real spelling: Pipecat takes them from the text, not from here."""
+
+        async def run_tts(self, text, context_id):
+            text = re.sub(r"(?i)cyno(?=cor|bot)", "Saino", text)
+            async for frame in super().run_tts(text, context_id):
+                yield frame
+
+    tts = SpokenNamesKokoro(
         settings=KokoroTTSService.Settings(voice=os.getenv("KOKORO_VOICE", "af_heart")),
-        # Pipecat drops a sentence whose audio takes >3 s to start; a CPU-only laptop can need longer.
-        stop_frame_timeout_s=10.0,
+        # Pipecat drops a sentence whose audio takes >3 s to start. A busy CPU-only laptop took
+        # over 10 s for a first sentence in tests, so wait longer: late is better than silent.
+        stop_frame_timeout_s=20.0,
     )
 
     context = LLMContext()
@@ -326,7 +344,7 @@ async def run_voice_session(connection: SmallWebRTCConnection, bus: StateBus):
     mode = "ONLINE" if online else "OFFLINE"
     logger.info(f"Starting voice session in {mode} mode")
     stats.session_start(mode)
-    await bus.update(voice_status="CONNECTING", voice_mode=mode)
+    await bus.update(voice_status="CONNECTING", voice_mode=mode, session_end=None)
 
     if not online:
         await offline_models.ready()
@@ -335,15 +353,19 @@ async def run_voice_session(connection: SmallWebRTCConnection, bus: StateBus):
         webrtc_connection=connection,
         params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
     )
+    recorded = greeting.load() if online else None
+    if online and not recorded:
+        asyncio.create_task(greeting.prepare())  # ready for the next visitor
     if online:
-        pipeline, context, llm = _build_online(transport, bus)
+        pipeline, context, llm = _build_online(transport, recorded_greeting=bool(recorded))
     else:
         pipeline, context = _build_offline(transport)
 
+    observer = DisplayObserver(bus)
     worker = PipelineWorker(
         pipeline,
         params=PipelineParams(enable_metrics=True),
-        observers=[DisplayObserver(bus, cards_from_transcript=not online)],
+        observers=[observer],
         idle_timeout_secs=None,  # a kiosk waits for visitors indefinitely
         processor_unusable_policy=ProcessorUnusablePolicy.END,
     )
@@ -354,6 +376,20 @@ async def run_voice_session(connection: SmallWebRTCConnection, bus: StateBus):
     async def on_client_connected(transport, client):
         logger.info("Chest display connected")
         await bus.update(voice_status="LIVE", expression="GREET", flow_step="GREET", card=None, user_text="")
+        if recorded:
+            text, pcm = recorded
+            context.add_message({"role": "assistant", "content": text})
+            await bus.update(last_spoken_text=text)
+            step = greeting.SAMPLE_RATE * 2 // 25  # 40 ms chunks
+            # Speech frames let the output detect talking, so the face moves its mouth. The
+            # trailing silence lets it notice the end at once instead of after a timeout.
+            pcm += bytes(step * 15)
+            audio = [
+                SpeechOutputAudioRawFrame(audio=pcm[i : i + step], sample_rate=greeting.SAMPLE_RATE, num_channels=1)
+                for i in range(0, len(pcm), step)
+            ]
+            await worker.queue_frames([LLMRunFrame(), *audio])
+            return
         # Ollama ignores the "developer" role, so use "user" for the kickoff there.
         context.add_message({"role": "developer" if online else "user", "content": assistant.load()["greeting"]})
         await worker.queue_frames([LLMRunFrame()])
@@ -364,14 +400,27 @@ async def run_voice_session(connection: SmallWebRTCConnection, bus: StateBus):
         await runner.cancel()
 
     watchdog = asyncio.create_task(_watch_gemini(llm, runner)) if online else None
+    idle_watch = None
+
+    @transport.event_handler("on_client_connected")
+    async def start_idle_watch(transport, client):
+        nonlocal idle_watch
+        observer.last_activity = asyncio.get_running_loop().time()
+        idle_watch = asyncio.create_task(_watch_idle(observer, runner, bus))
+
     try:
         await runner.run()
     finally:
-        if watchdog:
-            watchdog.cancel()
+        for task in (watchdog, idle_watch):
+            if task:
+                task.cancel()
         # If the brain died (e.g. Wi-Fi dropped mid-chat), hang up so the chest page
         # reconnects; the next session re-checks connectivity and can go OFFLINE.
         await connection.disconnect()
-        await bus.update(voice_status="OFFLINE", expression="IDLE", flow_step="IDLE")
+        # Back to the welcome screen: clear the last visitor's question, answer and card.
+        await bus.update(
+            voice_status="OFFLINE", expression="IDLE", flow_step="IDLE",
+            card=None, user_text="", last_spoken_text=DEFAULT_STATE["last_spoken_text"],
+        )
         stats.session_end()
         logger.info("Voice session ended")

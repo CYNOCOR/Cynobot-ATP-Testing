@@ -1,0 +1,6 @@
+{
+  "greeting": "A visitor just walked up. Welcome them to IIT , this is \"cynobot\" ,im here to help you in one short sentence and ask how you can help.",
+  "instructions": "",
+  "strict": true,
+  "on_topic": false
+}

@@ -393,7 +393,7 @@
           <div class="row"><div class="row-main"><div class="row-title">API key</div><div class="row-sub" id="keySub">Free from <a class="link" id="keyLink">aistudio.google.com/apikey</a></div></div>
             <div class="key-wrap"><input class="field" type="password" id="fKey" autocomplete="off" spellcheck="false" /><button class="btn" id="btnShowKey">Show</button></div></div>
           <div class="row"><div class="row-main"><div class="row-title">Voice</div></div><select class="field" data-key="GEMINI_VOICE"></select></div>
-          <div class="row"><div class="row-main"><div class="row-title">Model</div><div class="row-sub">Leave empty for the default</div></div><input class="field" data-key="GEMINI_MODEL" placeholder="models/gemini-3.8-live" /></div>
+          <div class="row"><div class="row-main"><div class="row-title">Model</div><div class="row-sub">Leave empty for the default</div></div><input class="field" data-key="GEMINI_MODEL" placeholder="models/gemini-3.1-flash-live-preview" /></div>
           <div class="row"><div class="row-main"><div class="row-title">Languages</div><div class="row-sub">Add <code>si-LK</code> for Sinhala later</div></div><input class="field" data-key="CYNO_LANGUAGES" placeholder="en-US" /></div>
         </div>
       </div>
@@ -411,6 +411,7 @@
       <div>
         <h2>Server</h2>
         <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Return to idle after</div><div class="row-sub">Seconds of silence before Cyno decides the visitor has left. 0 turns it off.</div></div><input class="field" data-key="CYNO_IDLE_SECS" inputmode="numeric" placeholder="40" /></div>
           <div class="row"><div class="row-main"><div class="row-title">Port</div></div><input class="field" data-key="PORT" inputmode="numeric" placeholder="7860" /></div>
           <div class="row"><div class="row-main"><div class="row-title">Always use offline mode</div><div class="row-sub">Rehearse without Gemini</div></div><label class="switch"><input type="checkbox" data-key="CYNO_FORCE_OFFLINE" /><span></span></label></div>
           <div class="row"><div class="row-main"><div class="row-title">Debug tools</div><div class="row-sub">Enables the Wi-Fi drop simulator</div></div><label class="switch"><input type="checkbox" data-key="CYNO_DEBUG" /><span></span></label></div>
@@ -451,6 +452,11 @@
         <input class="field" id="fFactKeywords" placeholder="library, books, study, reading" />
         <span class="hint">Leave empty to use words from the title.</span>
         <div class="warn" id="overlapWarn"></div>
+        <label for="fFactImage">Picture on the chest screen</label>
+        <div style="display:flex;gap:8px"><select class="field" id="fFactImage" style="flex:1"></select><button class="btn" id="btnAddPicture" type="button">Add picture…</button></div>
+        <label for="fFactLink">Link shown as a QR code</label>
+        <input class="field" id="fFactLink" placeholder="https://… (directions, a form, a web page)" />
+        <span class="hint">Visitors scan it with their phone. Leave empty for no QR code.</span>
         <label for="fFactSource">Source</label>
         <input class="field" id="fFactSource" placeholder="Where this came from" />
       </div>
@@ -524,7 +530,7 @@ function render(s) {
   $('tDelay').textContent = stats && stats.avg_delay_s != null ? `${stats.avg_delay_s.toFixed(1)}s` : '—';
   $('tDelayNote').textContent = stats && stats.last_delay_s != null ? `Last ${stats.last_delay_s.toFixed(1)}s · avg of 20` : 'Average of last 20';
   $('tTurns').textContent = stats ? stats.turns : 0;
-  $('tKb').textContent = `${stats ? stats.kb_lookups : 0} campus lookups`;
+  $('tKb').textContent = `${stats ? stats.kb_lookups : 0} answers matched a fact`;
   $('tSessions').textContent = stats ? stats.sessions_online + stats.sessions_offline : 0;
   $('tSessionsNote').textContent = `${stats ? stats.sessions_online : 0} online · ${stats ? stats.sessions_offline : 0} offline`;
   $('tFallbacks').textContent = stats ? stats.fallbacks : 0;
@@ -597,6 +603,7 @@ async function loadKnowledge() {
   }
   const k = await call('get_knowledge'); if (!k) return;
   facts = k.entries;
+  media = k.media || [];
   const unverified = facts.filter(f => f.verified === false).length;
   $('factCount').textContent = `· ${facts.length}${unverified ? ` · ${unverified} to check` : ''}`;
   // Unconfirmed facts first so they get noticed.
@@ -612,6 +619,12 @@ $('factList').addEventListener('click', (e) => {
   const row = e.target.closest('[data-id]'); if (row) openFact(facts.find(f => f.id === row.dataset.id));
 });
 
+let media = [];
+function fillPictures(selected) {
+  const names = [...new Set([...media, ...(selected ? [selected] : [])])];
+  $('fFactImage').innerHTML = '<option value="">None</option>' +
+    names.map(n => `<option value="${esc(n)}"${n === selected ? ' selected' : ''}>${esc(n)}</option>`).join('');
+}
 function openFact(f) {
   editingId = f ? f.id : null;
   $('factTitleHead').textContent = f ? 'Edit fact' : 'New fact';
@@ -619,6 +632,8 @@ function openFact(f) {
   $('fFactAnswer').value = f ? f.answer : '';
   $('fFactKeywords').value = f ? (f.keywords || []).join(', ') : '';
   $('fFactSource').value = f ? (f.source || '') : '';
+  $('fFactLink').value = f ? (f.link || '') : '';
+  fillPictures(f ? f.image : '');
   $('fFactVerified').checked = f ? f.verified !== false : true;
   $('btnDeleteFact').style.visibility = f ? 'visible' : 'hidden';
   $('overlapWarn').classList.remove('show');
@@ -629,6 +644,10 @@ function openFact(f) {
 }
 function closeFact() { $('factScrim').classList.remove('show'); }
 $('btnAddFact').addEventListener('click', () => openFact(null));
+$('btnAddPicture').addEventListener('click', async () => {
+  const r = await call('add_picture');
+  if (r && r.ok) { media = r.media; fillPictures(r.name); toast('Picture added'); }
+});
 $('btnCancelFact').addEventListener('click', closeFact);
 $('factScrim').addEventListener('click', (e) => { if (e.target === $('factScrim')) closeFact(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFact(); });
@@ -641,6 +660,7 @@ $('btnSaveFact').addEventListener('click', async () => {
   const r = await call('save_fact', {
     id: editingId, title: $('fFactTitle').value, answer: $('fFactAnswer').value,
     keywords: $('fFactKeywords').value, source: $('fFactSource').value, verified: $('fFactVerified').checked,
+    image: $('fFactImage').value, link: $('fFactLink').value.trim(),
   });
   if (!r || r.ok === false) return;
   closeFact(); await loadKnowledge(); toast(editingId ? 'Fact updated' : 'Fact added');

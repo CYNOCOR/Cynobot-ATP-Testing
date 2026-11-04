@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from cyno import assistant, knowledge, offline_models  # noqa: E402
+from cyno import offline_models  # noqa: E402
 
 QUESTION = "How do I apply to IIT?"
 
@@ -56,7 +56,7 @@ def whisper_bench(samples, rate):
 
 
 def ollama_bench():
-    from cyno.voice import OFFLINE_RULES, PERSONA
+    from cyno.voice import _facts_prompt
 
     model = offline_models.ollama_model_name()
     try:
@@ -67,7 +67,7 @@ def ollama_bench():
     if model not in names:
         print(f"[!!] Ollama model missing. Run: ollama pull {model}")
         return None
-    system = PERSONA + OFFLINE_RULES.format(facts=knowledge.as_prompt(confirmed_only=assistant.load()["strict"])) + assistant.instructions_block()
+    system = _facts_prompt()
     body = {"model": model, "stream": True, "max_tokens": 90,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": QUESTION}]}
     httpx.post("http://localhost:11434/api/generate", json={"model": model, "prompt": "hi", "stream": False, "keep_alive": "24h"}, timeout=180)
@@ -91,5 +91,5 @@ if __name__ == "__main__":
         # Kokoro speaks sentence by sentence, so the visitor waits for:
         # end-of-speech detection (~0.5s) + Whisper + first LLM sentence + first TTS sentence (~half the test clip).
         total = 0.5 + stt_time + llm_time + tts_time / 2
-        verdict = "OK" if total <= 3.5 else "SLOW: try OLLAMA_MODEL=llama3.2:1b and/or WHISPER_MODEL=base.en"
+        verdict = "OK" if total <= 3.5 else "SLOW: try WHISPER_MODEL=base.en"
         print(f"\nEstimated offline reply delay: ~{total:.1f}s  ->  {verdict}")

@@ -44,6 +44,7 @@ SETTINGS = {
     "KOKORO_VOICE": "af_heart",
     "KOKORO_THREADS": "",
     "PORT": "7860",
+    "CYNO_IDLE_SECS": "40",
     "CYNO_FORCE_OFFLINE": "",
     "CYNO_DEBUG": "",
 }
@@ -240,7 +241,25 @@ class Api:
     def get_knowledge(self):
         from cyno import knowledge
 
-        return {"entries": knowledge._load()}
+        return {"entries": knowledge._load(), "media": knowledge.media_files()}
+
+    def add_picture(self):
+        """Pick an image file and copy it into data/media so facts can show it on the chest."""
+        from cyno import knowledge
+
+        windows = webview.windows
+        if not windows:
+            return {"ok": False, "error": "No window"}
+        picked = windows[0].create_file_dialog(
+            webview.OPEN_DIALOG, file_types=("Images (*.png;*.jpg;*.jpeg;*.webp;*.gif;*.svg)",)
+        )
+        if not picked:
+            return {"ok": False}
+        src = Path(picked[0])
+        knowledge.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+        name = "".join(c if c.isalnum() or c in "-_." else "-" for c in src.name)
+        shutil.copyfile(src, knowledge.MEDIA_DIR / name)
+        return {"ok": True, "name": name, "media": knowledge.media_files()}
 
     def save_fact(self, entry: dict):
         from cyno import knowledge
@@ -290,6 +309,10 @@ class Api:
         from cyno import assistant
 
         assistant.save(greeting, instructions, strict, on_topic)
+        try:  # record the new greeting now, so the next visitor already hears it
+            httpx.post(f"{self._base()}/api/greeting/prepare", timeout=1.0)
+        except Exception:
+            pass  # server not running: it records the greeting when it starts
         return {"ok": True}
 
     # ---------- app preferences (kept outside .env: they are per computer, not per robot) ----------

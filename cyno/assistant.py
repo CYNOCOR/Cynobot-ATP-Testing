@@ -19,8 +19,8 @@ DEFAULTS = {
 
 STRICT_RULES = """
 Accuracy rules (strict mode, these override everything else):
-- Only state facts that come from the IIT knowledge you were given (lookup results or the Facts list).
-  Never use your own general knowledge about IIT, and never guess.
+- Only state facts that come from the knowledge you were given (the Facts list, including what
+  your chest screen shows). Never use your own general knowledge about IIT or Cynocor, and never guess.
 - Never invent or estimate names, room numbers, floors, directions, dates, times, prices, phone numbers,
   email addresses or web addresses. Say them exactly as they appear in the facts.
 - If the information is missing, incomplete or the facts disagree with each other, say:

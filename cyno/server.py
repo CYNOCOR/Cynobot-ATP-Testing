@@ -8,6 +8,7 @@
 Run:  .venv/bin/python -m cyno.server
 """
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,7 +16,7 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -26,7 +27,7 @@ from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCRequestHandler,
 )
 
-from cyno import offline_models
+from cyno import greeting, knowledge, offline_models
 from cyno.bus import StateBus
 from cyno.voice import run_voice_session
 
@@ -43,6 +44,7 @@ webrtc = SmallWebRTCRequestHandler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     offline_models.start_preload()  # background thread; server is usable immediately
+    asyncio.create_task(greeting.prepare())  # record the online greeting once
     yield
     await webrtc.close()
 
@@ -106,6 +108,25 @@ if os.getenv("CYNO_DEBUG") == "1":
         return {"gemini_blocked": bool(body.get("blocked"))}
 
 
+@app.post("/api/greeting/prepare")
+async def prepare_greeting():
+    """Cyno Control calls this after the greeting is edited."""
+    asyncio.create_task(greeting.prepare())
+    return {"ok": True}
+
+
+@app.get("/api/qr")
+async def qr(data: str):
+    """QR code (SVG) for a fact's link, made locally so it also works offline."""
+    import io
+
+    import segno
+
+    buf = io.BytesIO()
+    segno.make(data, error="m").save(buf, kind="svg", scale=10, border=2, dark="#000", light="#fff")
+    return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "max-age=3600"})
+
+
 @app.get("/")
 async def root():
     return RedirectResponse("/chest/")
@@ -113,6 +134,8 @@ async def root():
 
 app.mount("/face", StaticFiles(directory=FACE_DIR, html=True), name="face")
 app.mount("/chest", StaticFiles(directory=CHEST_DIR, html=True), name="chest")
+knowledge.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=knowledge.MEDIA_DIR), name="media")
 
 
 if __name__ == "__main__":

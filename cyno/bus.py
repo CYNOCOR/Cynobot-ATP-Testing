@@ -17,11 +17,12 @@ DEFAULT_STATE = {
     "expression": "IDLE",
     "eye_x": 0.0,
     "eye_y": 0.0,
-    "last_spoken_text": "Tap the screen to talk to Cyno.",
+    "last_spoken_text": "Tap the screen to talk to Cynobot.",
     "user_text": "",
     "card": None,  # {"title": str, "body": str} shown on the chest display
     "voice_status": "OFFLINE",  # OFFLINE | CONNECTING | LIVE  (is a voice session running?)
     "voice_mode": None,  # ONLINE (Gemini) | OFFLINE (local Whisper/Ollama/Kokoro)
+    "session_end": None,  # "idle" when Cyno hung up because the visitor walked away
 }
 
 

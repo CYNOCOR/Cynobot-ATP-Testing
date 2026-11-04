@@ -9,6 +9,7 @@ class Stats:
         self.started_at = time.time()
         self.sessions = {"ONLINE": 0, "OFFLINE": 0}
         self.fallbacks = 0  # online sessions ended by the Gemini watchdog
+        self.idle_ends = 0  # sessions ended because the visitor walked away
         self.turns = 0  # visitor questions heard
         self.kb_lookups = 0
         self.session_started_at: float | None = None
@@ -42,6 +43,7 @@ class Stats:
             "sessions_online": self.sessions.get("ONLINE", 0),
             "sessions_offline": self.sessions.get("OFFLINE", 0),
             "fallbacks": self.fallbacks,
+            "idle_ends": self.idle_ends,
             "turns": self.turns,
             "kb_lookups": self.kb_lookups,
             "session_mode": self.session_mode,
