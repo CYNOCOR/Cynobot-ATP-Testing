@@ -161,7 +161,8 @@ class DisplayObserver(BaseObserver):
     def __init__(self, bus: StateBus):
         super().__init__()
         self._bus = bus
-        self._card_id = None  # fact shown for the current visitor turn
+        self._card_id = None  # fact shown for the current answer
+        self._card_score = 0.0
         self._bot_text = ""
         self._user_text = ""
         self._new_bot_turn = True
@@ -171,6 +172,32 @@ class DisplayObserver(BaseObserver):
 
     def _touch(self):
         self.last_activity = asyncio.get_running_loop().time()
+
+    def _choose_card(self):
+        """Card for the answer so far: a dict, None to clear, or False for no change.
+
+        Uses the visitor's latest sentence plus everything Cynobot has said this turn, so a
+        stray keyword in the question can't put an unrelated picture up. A shown card only
+        changes when another fact fits the answer clearly better (no flicker mid-sentence)."""
+        heard = CYNOCOR_SOUNDALIKE.sub("Cynocor", self._user_text)
+        sentences = [s for s in re.split(r"(?<=[.?!])\s+", heard) if s.strip()]
+        best = knowledge.pick_card(sentences[-1] if sentences else heard, self._bot_text,
+                                   confirmed_only=assistant.load()["strict"])
+        if not best:
+            if self._card_id and knowledge.DECLINE.search(self._bot_text):
+                self._card_id, self._card_score = None, 0.0
+                return None
+            return False
+        score, entry = best
+        if entry["id"] == self._card_id:
+            self._card_score = score
+            return False
+        if self._card_id and score < self._card_score + 1:
+            return False
+        if self._card_id is None:
+            stats.kb_lookups += 1  # once per answer that showed a fact
+        self._card_id, self._card_score = entry["id"], score
+        return knowledge.card(entry)
 
     async def on_push_frame(self, data: FramePushed):
         if not data.first_push:
@@ -186,26 +213,21 @@ class DisplayObserver(BaseObserver):
                 self._new_user_turn = False
             self._user_text = f"{self._user_text} {frame.text}".strip()
             self._new_bot_turn = True
-            changes = {"expression": "THINKING", "flow_step": "CONVERSE", "user_text": self._user_text}
-            # Match the visitor's latest question (two can merge into one turn when Cyno didn't
-            # answer in between). No match clears the card, so an old picture never lingers.
-            heard = CYNOCOR_SOUNDALIKE.sub("Cynocor", self._user_text)
-            sentences = [s for s in re.split(r"(?<=[.?!])\s+", heard) if s.strip()]
-            hits = knowledge.search(sentences[-1] if sentences else self._user_text, limit=1,
-                                    confirmed_only=assistant.load()["strict"])
-            changes["card"] = knowledge.card(hits[0]) if hits else None
-            if hits and self._card_id is None:
-                stats.kb_lookups += 1  # once per visitor turn that matched a fact
-            self._card_id = hits[0]["id"] if hits else None
-            await self._bus.update(**changes)
+            # A new question clears the old card; the next one is chosen from Cynobot's answer.
+            await self._bus.update(expression="THINKING", flow_step="CONVERSE", user_text=self._user_text, card=None)
 
         elif isinstance(frame, TTSTextFrame):
             if self._new_bot_turn:
                 self._bot_text = ""
+                self._card_id, self._card_score = None, 0.0
                 self._new_bot_turn = False
             sep = "" if getattr(frame, "includes_inter_frame_spaces", False) or not self._bot_text else " "
             self._bot_text += sep + frame.text
-            await self._bus.update(last_spoken_text=self._bot_text.strip())
+            changes = {"last_spoken_text": self._bot_text.strip()}
+            card = self._choose_card()
+            if card is not False:
+                changes["card"] = card
+            await self._bus.update(**changes)
 
         elif isinstance(frame, BotStartedSpeakingFrame):
             self.bot_speaking = True

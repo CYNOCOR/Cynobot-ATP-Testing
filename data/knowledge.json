@@ -5,12 +5,14 @@
       "id": "about",
       "title": "About IIT",
       "keywords": [
-        "iit",
-        "about",
+        "about iit",
+        "what is iit",
+        "tell me about iit",
         "history",
         "founded",
         "founder",
-        "institute"
+        "who started iit",
+        "informatics institute"
       ],
       "answer": "The Informatics Institute of Technology was founded in Colombo in 1990 by Dr. Gamini Wickramasinghe, starting as the Informatics Institute of Computer Studies with 22 students and 6 lecturers. It offers IT, business and innovation education, and was the first private institute in Sri Lanka to offer British degrees.",
       "source": "https://www.iit.ac.lk/about/",
@@ -115,7 +117,8 @@
       ],
       "answer": "Local students register in person at the Main Campus, 57 Ramakrishna Road, Colombo 6. It's best to book an appointment with the admissions office or a careers counsellor first, and the process includes an interview where you must be present. International students can email admissions@iit.ac.lk.",
       "source": "https://www.iit.ac.lk/admission/",
-      "verified": true
+      "verified": true,
+      "link": "mailto:admissions@iit.ac.lk?subject=Admission%20enquiry"
     },
     {
       "id": "undergraduate",
@@ -212,7 +215,7 @@
       ],
       "answer": "The Admissions Office is on the Ground Floor, to your left at Spencer Building",
       "source": "SAMPLE from controls.html demo",
-      "verified": false
+      "verified": true
     },
     {
       "id": "auditorium",
@@ -225,7 +228,7 @@
       ],
       "answer": "The Main Auditorium is on the 5th Floor at GP Square Building",
       "source": "SAMPLE from controls.html demo",
-      "verified": false
+      "verified": true
     },
     {
       "id": "deans",

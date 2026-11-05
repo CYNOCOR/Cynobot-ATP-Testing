@@ -38,6 +38,53 @@ def search(query: str, limit: int = 3, confirmed_only: bool = False) -> list[dic
     return [e for _, e in search_scored(query, limit, confirmed_only)]
 
 
+# ---- Chest card choice ---------------------------------------------------------------
+# A keyword in the question alone is weak evidence (a visitor can say "library" in passing),
+# so the card follows what Cynobot actually says: a fact is shown once the spoken answer
+# contains words that only that fact has (names, numbers, emails), with the question's
+# keywords only breaking ties. If Cynobot declines or talks about something else, no card.
+
+ANSWER_STOPWORDS = {
+    "the", "and", "for", "are", "was", "with", "you", "your", "can", "its", "it's", "has", "have", "that",
+    "this", "from", "which", "who", "also", "one", "our", "there", "they", "their", "includes", "include",
+    "offers", "offer", "other", "into", "out", "all", "any", "but", "not", "iit", "institute", "informatics",
+    "technology", "colombo", "road", "university", "students", "student", "first", "best", "here", "phone",
+}
+DECLINE = re.compile(r"front desk|not sure|don't know|do not know|don't have that|no information", re.I)
+
+
+def _tokens(text: str) -> set[str]:
+    return {t for t in re.findall(r"[a-z]+|\d+", text.lower()) if t not in ANSWER_STOPWORDS and (len(t) > 2 or t.isdigit())}
+
+
+def _answer_score(entry: dict, spoken: set[str], df: dict[str, int]) -> float:
+    """How much of this fact's own wording Cynobot said; words shared by many facts count little."""
+    return sum(1 / df[t] for t in _tokens(entry["answer"]) if t in spoken)
+
+
+def pick_card(question: str, spoken: str, confirmed_only: bool = False) -> tuple[float, dict] | None:
+    """The fact to show for this exchange, or None. Call again as more of the answer arrives."""
+    if not spoken.strip() or DECLINE.search(spoken):
+        return None
+    entries = _entries(confirmed_only)
+    df: dict[str, int] = {}
+    for e in entries:
+        for t in _tokens(e["answer"]):
+            df[t] = df.get(t, 0) + 1
+    said = _tokens(spoken)
+    asked = {e["id"]: s for s, e in search_scored(question, limit=len(entries), confirmed_only=confirmed_only)}
+    echoed = {e["id"]: s for s, e in search_scored(spoken, limit=len(entries), confirmed_only=confirmed_only)}
+    best = None
+    for e in entries:
+        a, q, k = _answer_score(e, said, df), asked.get(e["id"], 0), echoed.get(e["id"], 0)
+        # Shown when the answer clearly comes from this fact, or the answer and question agree on it.
+        if a >= 2 or (a >= 1 and (q or k)) or (q and k):
+            score = a + 0.5 * k + 0.75 * min(q, 2)
+            if not best or score > best[0]:
+                best = (score, e)
+    return best
+
+
 def overlaps(entry: dict) -> list[str]:
     """Titles of other facts sharing keywords with this one: places where answers could contradict."""
     keywords = entry.get("keywords") or []
@@ -98,8 +145,8 @@ def upsert(entry: dict) -> dict:
     if image:
         stored["image"] = Path(image).name
     if link:
-        if not re.match(r"https?://", link):
-            raise ValueError("The QR code link must start with http:// or https://")
+        if not re.match(r"(https?://|mailto:)", link):
+            raise ValueError("The QR code link must start with http://, https:// or mailto:")
         stored["link"] = link
     for i, e in enumerate(entries):
         if e["id"] == entry_id:
@@ -134,7 +181,9 @@ def _visual_note(entry: dict) -> str:
     parts = []
     if entry.get("image") and (MEDIA_DIR / entry["image"]).is_file():
         parts.append("picture of " + Path(entry["image"]).stem.replace("-", " ").replace("_", " "))
-    if entry.get("link"):
+    if entry.get("link", "").startswith("mailto:"):
+        parts.append(f"QR code that opens an email to {entry['link'][7:].split('?')[0]}")
+    elif entry.get("link"):
         parts.append("QR code visitors can scan")
     return ", ".join(parts)
 

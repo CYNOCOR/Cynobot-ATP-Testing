@@ -140,7 +140,7 @@
       <div class="card" id="card">
         <div class="card-main">
           <div class="card-text"><h2 class="reveal" id="cardTitle"></h2><p class="reveal" id="cardBody"></p></div>
-          <div class="qr hidden" id="cardQr"><img id="cardQrImg" alt="QR code" /><span class="reveal r3">Scan with your phone</span></div>
+          <div class="qr hidden" id="cardQr"><img id="cardQrImg" alt="QR code" /><span class="reveal r3" id="cardQrLabel">Scan with your phone</span></div>
         </div>
         <div class="media hidden" id="cardMedia"><img id="cardImg" alt="" /></div>
       </div>
@@ -196,6 +196,7 @@
       $('cardTitle').textContent = card.title;
       $('cardBody').textContent = card.body;
       $('cardQr').classList.toggle('hidden', !card.link);
+      $('cardQrLabel').textContent = (card.link || '').startsWith('mailto:') ? 'Scan to email us' : 'Scan with your phone';
       $('cardMedia').classList.toggle('hidden', !card.image);
       await Promise.all([
         loadImage($('cardImg'), card.image || ''),
