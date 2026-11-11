@@ -181,11 +181,23 @@ def _visual_note(entry: dict) -> str:
     parts = []
     if entry.get("image") and (MEDIA_DIR / entry["image"]).is_file():
         parts.append("picture of " + Path(entry["image"]).stem.replace("-", " ").replace("_", " "))
-    if entry.get("link", "").startswith("mailto:"):
-        parts.append(f"QR code that opens an email to {entry['link'][7:].split('?')[0]}")
-    elif entry.get("link"):
-        parts.append("QR code visitors can scan")
+    if entry.get("link"):
+        parts.append(qr_purpose(entry["link"]))
     return ", ".join(parts)
+
+
+MAP_LINK = re.compile(r"https?://(?:share\.google|maps\.app\.goo\.gl|goo\.gl/maps|(?:www\.)?google\.[a-z.]+/maps|maps\.google\.)", re.I)
+
+
+def qr_purpose(link: str) -> str:
+    """What scanning this QR code does, in words Cynobot can say (so it never calls an email QR 'directions')."""
+    if link.startswith("mailto:"):
+        return f"QR code to send an email to {link[7:].split('?')[0]}"
+    if MAP_LINK.match(link):
+        return "QR code that opens directions in Google Maps"
+    domain = re.sub(r"^https?://(www\.)?", "", link).split("/")[0]
+    page = "contact page" if "contact" in link.lower() else "website"
+    return f"QR code that opens the {domain} {page}"
 
 
 def card(entry: dict) -> dict:

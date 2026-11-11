@@ -157,6 +157,26 @@
   }
   .seg button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 
+  /* Face alignment */
+  .align-ctl { display: flex; align-items: center; gap: 8px; }
+  .align-ctl input[type=range] { width: 200px; accent-color: var(--accent); }
+  .align-ctl .num { width: 64px; text-align: right; padding: 6px 8px; }
+  .align-ctl .step { padding: 5px 10px; min-width: 32px; }
+  .align-pad { display: grid; grid-template-columns: repeat(3, 36px); gap: 4px; }
+  .align-pad .btn { padding: 6px 0; }
+
+  /* Games page */
+  .pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; padding: 4px 16px 16px; }
+  .pics:empty { display: none; }
+  .pic { position: relative; border-radius: 10px; overflow: hidden; background: var(--fill); aspect-ratio: 4 / 3; }
+  .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pic span { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 8px; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pic button { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer;
+    background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 14px; line-height: 1; }
+  .pic button:hover { background: #d33; }
+  .dim { opacity: 0.45; pointer-events: none; }
+
   /* Conversation */
   .convo { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
   .say-label { font-size: 12px; color: var(--ink-3); margin-bottom: 4px; }
@@ -248,6 +268,7 @@
     </div>
     <button class="nav-item active" data-page="overview">Overview</button>
     <button class="nav-item" data-page="knowledge">Knowledge</button>
+    <button class="nav-item" data-page="games">Games</button>
     <button class="nav-item" data-page="controls">Controls</button>
     <button class="nav-item" data-page="settings">Settings</button>
     <button class="nav-item" data-page="activity">Activity</button>
@@ -324,6 +345,7 @@
         <h2>Answer rules</h2>
         <div class="card group">
           <div class="row"><div class="row-main"><div class="row-title">Strict answers</div><div class="row-sub">Only confirmed facts, no guessing. If Cyno doesn't know or facts disagree, it says so and points to the front desk.</div></div><label class="switch"><input type="checkbox" id="swStrict" /><span></span></label></div>
+          <div class="row"><div class="row-main"><div class="row-title">Social chat</div><div class="row-sub">Friendly small talk and clean jokes, with safety limits: no politics, religion, romance or personal details, and it never makes up campus facts. Off = receptionist questions only.</div></div><label class="switch"><input type="checkbox" id="swSocial" /><span></span></label></div>
           <div class="row"><div class="row-main"><div class="row-title">Stay on topic</div><div class="row-sub">Politely decline questions that aren't about IIT</div></div><label class="switch"><input type="checkbox" id="swOnTopic" /><span></span></label></div>
         </div>
       </div>
@@ -345,6 +367,48 @@
       </div>
     </section>
 
+    <!-- ================= Games ================= -->
+    <section class="page" id="games">
+      <div><h1>Games</h1><p class="lede">Short games visitors play on the chest screen, by touch or by saying "play a game".</p></div>
+
+      <div>
+        <h2>Games on the robot</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Games</div><div class="row-sub">Master switch. Off hides the Games button and Cynobot stops offering games.</div></div><label class="switch"><input type="checkbox" id="swGames" /><span></span></label></div>
+          <div id="gameRows"></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Time limits</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Longest game</div><div class="row-sub">A game ends at this time, then the screen goes back to receptionist mode.</div></div>
+            <select class="field" id="selGameLimit" style="width:160px"><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Close when nobody is playing</div><div class="row-sub">A tap game closes after this long with no touch.</div></div>
+            <select class="field" id="selGameIdle" style="width:160px"><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">1 minute</option></select></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="list-head" style="display:flex;align-items:center;justify-content:space-between">
+          <h2 style="padding:0">Picture Puzzle pictures <span id="picCount" style="font-weight:400"></span></h2>
+          <button class="btn" id="btnAddPics">Add pictures…</button>
+        </div>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-sub" id="picNote">Landscape photos work best. With no pictures here, the puzzle uses the campus photos.</div></div></div>
+          <div class="pics" id="picList"></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Questions and today's scores</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Riddles and Find Your Degree questions</div><div class="row-sub">Opens data/game_content.json. Changes apply the next time a game starts.</div></div><button class="btn" id="btnGameContent">Open file</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Today's best</div><div class="row-sub" id="bestToday">No games finished today.</div></div></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ================= Controls ================= -->
     <section class="page" id="controls">
       <div><h1>Controls</h1><p class="lede">Drive the robot's screens and test its fallbacks.</p></div>
@@ -353,6 +417,8 @@
         <h2>Displays</h2>
         <div class="card group">
           <div class="row"><div class="row-main"><div class="row-title">Chest touchscreen</div><div class="row-sub">Microphone, speaker, captions and info cards</div></div><button class="btn" data-open="chest">Open</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Locked chest screen</div><div class="row-sub" id="kioskSub">Full screen with no close button, so visitors can't close it. To unlock on the screen: tap the CYNOBOT logo 3 times, hold it for 10 seconds, then enter the PIN. Or unlock from here.</div></div>
+            <div class="align-ctl"><input class="field" id="fKioskPin" type="password" inputmode="numeric" maxlength="8" placeholder="New PIN" style="width:110px" autocomplete="off" /><button class="btn" id="btnKioskPin">Set PIN</button><button class="btn primary" id="btnKiosk">Open locked</button></div></div>
           <div class="row"><div class="row-main"><div class="row-title">Face display</div><div class="row-sub">Second screen. Press F for fullscreen.</div></div><button class="btn" data-open="face">Open</button></div>
         </div>
       </div>
@@ -364,6 +430,35 @@
             <div class="seg" id="segExpr"><button data-v="IDLE">Idle</button><button data-v="HAPPY">Happy</button><button data-v="THINKING">Thinking</button><button data-v="SPEAKING">Speaking</button></div></div>
           <div class="row"><div class="row-main"><div class="row-title">Color</div></div>
             <div class="seg" id="segTheme"><button data-v="RED">Red</button><button data-v="BLUE">Blue</button></div></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Devices</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Microphone, speaker and camera</div><div class="row-sub" id="devSub">Which devices Cynobot uses. Only Cynobot changes; the computer's own sound settings stay as they are.</div></div><button class="btn" id="btnScanDev">Find devices</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Microphone</div><div class="row-sub">Used from the next conversation</div></div><select class="field" id="selMic" data-kind="mic" style="width:300px"></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Speaker</div><div class="row-sub">Changes straight away (Chrome or Edge)</div></div><select class="field" id="selSpeaker" data-kind="speaker" style="width:300px"></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Camera</div><div class="row-sub">For Selfie with Cynobot</div></div><select class="field" id="selCamera" data-kind="camera" style="width:300px"></select></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Face alignment</h2>
+        <div class="card group">
+          <div class="row"><div class="row-main"><div class="row-title">Glow ring</div><div class="row-sub" id="alignSub">Move each edge of the glowing frame so it lines up with the head opening. Changes show on the face display straight away.</div></div><button class="btn" id="btnAlignReset">Reset</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Top edge</div><div class="row-sub">Pixels from the top of the screen</div></div>
+            <div class="align-ctl" data-side="top"><button class="btn step" data-d="-1">−</button><input type="range" min="0" max="300" /><button class="btn step" data-d="1">+</button><input class="field num" type="number" min="0" max="600" /></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Bottom edge</div><div class="row-sub">Pixels from the bottom</div></div>
+            <div class="align-ctl" data-side="bottom"><button class="btn step" data-d="-1">−</button><input type="range" min="0" max="300" /><button class="btn step" data-d="1">+</button><input class="field num" type="number" min="0" max="600" /></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Left edge</div><div class="row-sub">Pixels from the left</div></div>
+            <div class="align-ctl" data-side="left"><button class="btn step" data-d="-1">−</button><input type="range" min="0" max="300" /><button class="btn step" data-d="1">+</button><input class="field num" type="number" min="0" max="600" /></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Right edge</div><div class="row-sub">Pixels from the right</div></div>
+            <div class="align-ctl" data-side="right"><button class="btn step" data-d="-1">−</button><input type="range" min="0" max="300" /><button class="btn step" data-d="1">+</button><input class="field num" type="number" min="0" max="600" /></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Corner roundness</div><div class="row-sub">Radius of the frame corners</div></div>
+            <div class="align-ctl" data-side="radius"><button class="btn step" data-d="-1">−</button><input type="range" min="0" max="400" /><button class="btn step" data-d="1">+</button><input class="field num" type="number" min="0" max="400" /></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Move or resize the whole ring</div><div class="row-sub">Arrows shift it by 2 px; centre buttons grow or shrink it on every side.</div></div>
+            <div class="align-pad"><span></span><button class="btn" data-move="up" title="Move up">↑</button><span></span><button class="btn" data-move="left" title="Move left">←</button><button class="btn" data-move="grow" title="Bigger on every side">＋</button><button class="btn" data-move="right" title="Move right">→</button><button class="btn" data-move="shrink" title="Smaller on every side">－</button><button class="btn" data-move="down" title="Move down">↓</button><span></span></div></div>
         </div>
       </div>
 
@@ -586,6 +681,155 @@ $('segTheme').addEventListener('click', async (e) => {
   if (!lastStatus || !lastStatus.server.running) return toast('Start Cyno first');
   setSeg('segTheme', v); await call('set_state', { theme: v });
 });
+// ---------- face alignment ----------
+let frame = null, frameDefault = null, frameTimer = null;
+function renderFrame() {
+  document.querySelectorAll('.align-ctl').forEach(c => {
+    const v = frame[c.dataset.side];
+    c.querySelector('input[type=range]').value = v;
+    if (document.activeElement !== c.querySelector('.num')) c.querySelector('.num').value = v;
+  });
+}
+function pushFrame() {  // live while dragging, at most ~16 updates a second
+  renderFrame();
+  if (frameTimer) return;
+  frameTimer = setTimeout(async () => {
+    frameTimer = null;
+    const r = await call('set_face_frame', frame);
+    if (r) $('alignSub').textContent = r.live
+      ? 'Saved. The face display moves as you change it.'
+      : 'Saved. Cyno is stopped, so the face display picks this up when it starts.';
+  }, 60);
+}
+function setFrame(changes, together = false) {
+  if (together && Object.values(changes).some(v => v < 0)) return toast('The ring is already at the screen edge');
+  for (const [k, v] of Object.entries(changes)) frame[k] = Math.max(0, Math.min(k === 'radius' ? 400 : 600, Math.round(Number(v) || 0)));
+  pushFrame();
+}
+async function loadFrame() {
+  const r = await call('get_face_frame');
+  if (r) { frame = r.frame; frameDefault = r.default; renderFrame(); }
+}
+document.querySelectorAll('.align-ctl').forEach(c => {
+  const k = c.dataset.side;
+  c.querySelector('input[type=range]').addEventListener('input', (e) => setFrame({ [k]: e.target.value }));
+  c.querySelector('.num').addEventListener('change', (e) => setFrame({ [k]: e.target.value }));
+  c.querySelectorAll('.step').forEach(b => b.addEventListener('click', () => setFrame({ [k]: frame[k] + Number(b.dataset.d) })));
+});
+document.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', () => {
+  const f = frame, n = 2;
+  ({
+    up: () => setFrame({ top: f.top - n, bottom: f.bottom + n }, true),
+    down: () => setFrame({ top: f.top + n, bottom: f.bottom - n }, true),
+    left: () => setFrame({ left: f.left - n, right: f.right + n }, true),
+    right: () => setFrame({ left: f.left + n, right: f.right - n }, true),
+    grow: () => setFrame({ top: f.top - n, bottom: f.bottom - n, left: f.left - n, right: f.right - n }),
+    shrink: () => setFrame({ top: f.top + n, bottom: f.bottom + n, left: f.left + n, right: f.right + n }),
+  })[b.dataset.move]();
+}));
+$('btnAlignReset').addEventListener('click', () => { setFrame({ ...frameDefault }); toast('Glow ring reset'); });
+// ---------- games ----------
+let gamesData = null;
+const SCORE_FMT = { riddles: s => `${s} / 5`, memory: s => `${s} moves`, puzzle: s => `${s} s`, wordchain: s => `${s} words` };
+function renderGames() {
+  const g = gamesData; if (!g) return;
+  $('swGames').checked = g.settings.enabled;
+  $('gameRows').className = g.settings.enabled ? '' : 'dim';
+  $('gameRows').innerHTML = g.games.map(x => `
+    <div class="row" style="border-top:1px solid var(--hair)"><div class="row-main"><div class="row-title">${esc(x.title)}</div><div class="row-sub">${esc(x.about)}${x.voice ? ' Needs the online brain; hidden when Cynobot is offline.' : ' Works offline.'}</div></div>
+      <label class="switch"><input type="checkbox" data-game="${x.id}" ${g.settings.games[x.id] ? 'checked' : ''} /><span></span></label></div>`).join('');
+  $('gameRows').querySelectorAll('[data-game]').forEach(sw => sw.addEventListener('change', () =>
+    saveGames({ games: { [sw.dataset.game]: sw.checked } }, `${g.games.find(x => x.id === sw.dataset.game).title} ${sw.checked ? 'on' : 'off'}`)));
+  $('selGameLimit').value = String(g.settings.time_limit_secs);
+  if ($('selGameLimit').value !== String(g.settings.time_limit_secs)) $('selGameLimit').value = '120';
+  $('selGameIdle').value = String(g.settings.idle_secs);
+  if ($('selGameIdle').value !== String(g.settings.idle_secs)) $('selGameIdle').value = '30';
+  const best = Object.entries(g.best || {});
+  $('bestToday').textContent = best.length ? best.map(([k, v]) => {
+    const [id, level] = k.split(':'); const t = (g.games.find(x => x.id === id) || {}).title || id;
+    return `${t}${level && level !== 'any' ? ` (${level})` : ''}: ${(SCORE_FMT[id] || String)(v)}`;
+  }).join(' · ') : 'No games finished today.';
+  renderPics(g.pictures);
+}
+async function renderPics(names) {
+  $('picCount').textContent = names.length ? `(${names.length})` : '';
+  $('picList').innerHTML = names.map(n => `<div class="pic" data-name="${esc(n)}"><img alt="" /><span>${esc(n)}</span><button title="Remove">×</button></div>`).join('');
+  $('picList').querySelectorAll('.pic').forEach(async el => {
+    el.querySelector('button').addEventListener('click', async () => {
+      const r = await call('remove_puzzle_picture', el.dataset.name);
+      if (r && r.ok) { gamesData.pictures = r.pictures; renderPics(r.pictures); toast('Picture removed'); }
+    });
+    const d = await call('puzzle_picture_data', el.dataset.name);
+    if (d && d.ok) el.querySelector('img').src = d.src;
+  });
+}
+async function loadGames() { const g = await call('get_games'); if (g) { gamesData = g; renderGames(); } }
+async function saveGames(changes, msg) {
+  const r = await call('save_games', changes);
+  if (r && r.ok) { gamesData.settings = r.settings; renderGames(); toast(msg); }
+}
+$('swGames').addEventListener('change', () => saveGames({ enabled: $('swGames').checked }, $('swGames').checked ? 'Games on' : 'Games off'));
+$('selGameLimit').addEventListener('change', () => saveGames({ time_limit_secs: Number($('selGameLimit').value) }, 'Time limit saved'));
+$('selGameIdle').addEventListener('change', () => saveGames({ idle_secs: Number($('selGameIdle').value) }, 'Saved'));
+$('btnAddPics').addEventListener('click', async () => {
+  const r = await call('add_puzzle_pictures');
+  if (r && r.ok) { gamesData.pictures = r.pictures; renderPics(r.pictures); }
+});
+$('btnGameContent').addEventListener('click', () => call('open_game_content'));
+document.querySelector('[data-page="games"]').addEventListener('click', loadGames);
+
+// ---------- devices ----------
+const DEV_SEL = { mic: 'selMic', speaker: 'selSpeaker', camera: 'selCamera' };
+async function loadDevices() {
+  const d = await call('get_devices'); if (!d) return;
+  let any = false;
+  for (const [kind, id] of Object.entries(DEV_SEL)) {
+    const names = d.seen[kind] || [], chosen = d.chosen[kind] || '';
+    any = any || names.length > 0;
+    const list = chosen && !names.includes(chosen) ? [...names, chosen] : names;
+    if (document.activeElement === $(id)) continue;
+    $(id).innerHTML = `<option value="">System default</option>` + list.map(n =>
+      `<option value="${esc(n)}">${esc(n)}${names.includes(n) ? '' : ' (not connected)'}</option>`).join('');
+    $(id).value = chosen;
+  }
+  $('devSub').textContent = !d.running ? 'Start Cyno and open the chest screen to list this computer\'s devices.'
+    : any ? 'Which devices Cynobot uses. Only Cynobot changes; the computer\'s own sound settings stay as they are.'
+    : 'Open the chest screen, then press Find devices and allow the microphone and camera when the browser asks.';
+}
+Object.entries(DEV_SEL).forEach(([kind, id]) => $(id).addEventListener('change', async () => {
+  const r = await call('set_devices', { [kind]: $(id).value });
+  if (r && r.ok) toast(r.live ? 'Device saved' : 'Saved. Used when Cyno starts.');
+}));
+$('btnScanDev').addEventListener('click', async () => {
+  const r = await call('scan_devices');
+  if (r && r.ok) { toast('Looking for devices on the chest screen…'); setTimeout(loadDevices, 2500); setTimeout(loadDevices, 6000); }
+});
+document.querySelector('[data-page="controls"]').addEventListener('click', loadDevices);
+// ---------- locked chest screen ----------
+let kioskState = null;
+async function loadKiosk() {
+  const k = await call('kiosk_status'); if (!k) return;
+  kioskState = k;
+  $('btnKiosk').textContent = k.open ? 'Unlock and close' : 'Open locked';
+  $('btnKiosk').classList.toggle('primary', !k.open);
+  $('fKioskPin').placeholder = k.has_pin ? 'Change PIN' : 'New PIN';
+  $('kioskSub').textContent = !k.browser ? 'Needs Google Chrome or Microsoft Edge on this computer.'
+    : !k.has_pin ? 'Set a 4 to 8 digit staff PIN first. Visitors then can\'t close the screen; staff unlock it with the PIN.'
+    : k.open ? 'The chest screen is locked. On it, tap the CYNOBOT logo 3 times, then hold it for 10 seconds and enter the PIN. Or unlock it from here.'
+    : 'Full screen with no close button, so visitors can\'t close it. To unlock on the screen: tap the CYNOBOT logo 3 times, hold it for 10 seconds, then enter the PIN. Or unlock from here.';
+}
+$('btnKioskPin').addEventListener('click', async () => {
+  const r = await call('set_kiosk_pin', $('fKioskPin').value);
+  if (r && r.ok) { $('fKioskPin').value = ''; toast('PIN saved'); loadKiosk(); }
+});
+$('btnKiosk').addEventListener('click', async () => {
+  if (!lastStatus || !lastStatus.server.running) return toast('Start Cyno first');
+  const r = await call(kioskState && kioskState.open ? 'close_kiosk' : 'open_kiosk');
+  if (r && r.ok) toast(r.open ? 'Chest screen opened and locked' : 'Chest screen unlocked and closed');
+  loadKiosk();
+});
+document.querySelector('[data-page="controls"]').addEventListener('click', loadKiosk);
+setInterval(() => { if ($('controls').classList.contains('active')) loadKiosk(); }, 4000);
 // ---------- knowledge ----------
 let facts = [], editingId = null;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -600,6 +844,7 @@ async function loadKnowledge() {
     $('fGreeting').placeholder = a.default_greeting;
     $('swStrict').checked = a.strict !== false;
     $('swOnTopic').checked = !!a.on_topic;
+    $('swSocial').checked = a.social !== false;
   }
   const k = await call('get_knowledge'); if (!k) return;
   facts = k.entries;
@@ -673,17 +918,19 @@ $('btnDeleteFact').addEventListener('click', async () => {
   await call('delete_fact', editingId); closeFact(); await loadKnowledge(); toast('Fact deleted');
 });
 $('btnSaveInstr').addEventListener('click', async () => {
-  const r = await call('save_assistant', $('fGreeting').value, $('fInstructions').value, $('swStrict').checked, $('swOnTopic').checked);
+  const r = await call('save_assistant', $('fGreeting').value, $('fInstructions').value, $('swStrict').checked, $('swOnTopic').checked, $('swSocial').checked);
   if (r && r.ok) { await loadKnowledge(); toast('Saved. Cyno uses it from the next conversation.'); }
 });
 // Rule switches save at once, using the last *saved* text (unsaved edits in the boxes stay unsaved).
-['swStrict', 'swOnTopic'].forEach(id => $(id).addEventListener('change', async () => {
+['swStrict', 'swOnTopic', 'swSocial'].forEach(id => $(id).addEventListener('change', async () => {
   if (!asst) return;
-  const r = await call('save_assistant', asst.greeting, asst.instructions, $('swStrict').checked, $('swOnTopic').checked);
+  const r = await call('save_assistant', asst.greeting, asst.instructions, $('swStrict').checked, $('swOnTopic').checked, $('swSocial').checked);
   if (r && r.ok) {
-    asst.strict = $('swStrict').checked; asst.on_topic = $('swOnTopic').checked;
+    asst.strict = $('swStrict').checked; asst.on_topic = $('swOnTopic').checked; asst.social = $('swSocial').checked;
     toast(id === 'swStrict'
       ? ($('swStrict').checked ? 'Strict answers on: only confirmed facts' : 'Strict answers off: unconfirmed facts can be used')
+      : id === 'swSocial'
+      ? ($('swSocial').checked ? 'Social chat on from the next conversation' : 'Social chat off: receptionist questions only')
       : ($('swOnTopic').checked ? 'Cyno will stay on IIT topics' : 'Cyno can chat about other topics'));
     if ($('fTry').value.trim()) tryQuestion();
   }
@@ -815,7 +1062,7 @@ applyTheme('auto');
 window.addEventListener('pywebviewready', async () => {
   api = window.pywebview.api;
   const prefs = await call('get_prefs'); if (prefs) applyTheme(prefs.appearance);
-  poll(); pollLogs();
+  poll(); pollLogs(); loadFrame(); loadGames(); loadDevices(); loadKiosk();
 });
 </script>
 </body>

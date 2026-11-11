@@ -112,7 +112,7 @@
       animation: invite 3.2s var(--ease) infinite; transition: transform 0.25s var(--spring); }
     .start:active { transform: scale(0.96); }
     @keyframes invite { 50% { box-shadow: 0 18px 70px rgba(var(--accent-rgb), 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.35); } }
-    .bottom { display: flex; justify-content: center; min-height: 40px; }
+    .bottom { display: flex; justify-content: center; gap: 12px; min-height: 40px; }
     .end { appearance: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
       height: 40px; padding: 0 22px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge);
       backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
@@ -122,6 +122,7 @@
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
   </style>
+  <link rel="stylesheet" href="games.css?v=1" />
 </head>
 <body>
   <div class="ambient"></div>
@@ -149,11 +150,14 @@
     </main>
 
     <footer class="bottom">
+      <button class="end hidden" id="btnGames">Games</button>
       <button class="end hidden" id="btnEnd">End conversation</button>
     </footer>
   </div>
   <audio id="botAudio" autoplay></audio>
+  <div class="games hidden" id="games"></div>
 
+  <script src="devices.js?v=1"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     let pc = null;
@@ -248,6 +252,9 @@
       $('mode').classList.toggle('hidden', !live || !state.voice_mode);
       $('mode').classList.toggle('offline-mode', state.voice_mode === 'OFFLINE');
       $('mode').textContent = state.voice_mode === 'OFFLINE' ? 'Offline mode' : 'Online';
+      // Add-ons (device choice, games) follow the same state; a fault there must not stop the display.
+      try { if (window.CynoDevices) CynoDevices.onState(state); } catch (e) {}
+      try { if (window.CynoGames) CynoGames.onState(state); } catch (e) {}
     }
 
     function connectBus() {
@@ -275,9 +282,14 @@
       $('error').textContent = '';
       try {
         // Browser echo cancellation keeps Cynobot from hearing its own voice.
-        micStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
+        const mic = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: window.CynoDevices ? CynoDevices.audio(mic) : mic });
+        } catch (e) {
+          // The chosen microphone was unplugged: use the default one rather than failing.
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: mic });
+        }
+        if (window.CynoDevices) CynoDevices.refresh();  // device names are visible once the mic is allowed
         pc = new RTCPeerConnection();
         // Pipecat expects transceiver 0 = audio, 1 = video (video stays unused).
         pc.addTransceiver(micStream.getAudioTracks()[0], { direction: 'sendrecv' });
@@ -324,6 +336,10 @@
 
     $('btnStart').addEventListener('click', () => { wantVoice = true; startVoice(); });
     $('btnEnd').addEventListener('click', () => { wantVoice = false; closeLink(); });
+    // For the games add-on: start a conversation (Word Chain is played by voice).
+    window.CynoChest = { startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; startVoice(); } } };
   </script>
+  <script src="games.js?v=1"></script>
+  <script src="kiosk.js?v=2"></script>
 </body>
 </html>

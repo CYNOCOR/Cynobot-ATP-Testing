@@ -217,6 +217,149 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    def get_face_frame(self):
+        from cyno import display
+
+        return {"frame": display.load_frame(), "default": display.DEFAULT_FRAME}
+
+    def set_face_frame(self, frame: dict):
+        """Move the face's glow ring; live on the face display when the server is running."""
+        from cyno import display
+
+        try:
+            r = httpx.post(f"{self._base()}/api/face-frame", json=frame, timeout=1.5)
+            if r.status_code == 200:
+                return {"ok": True, "live": True, "frame": r.json()}
+        except Exception:
+            pass
+        return {"ok": True, "live": False, "frame": display.save_frame(frame)}  # applied on next start
+
+    # ---------- games ----------
+
+    def _notify(self, path: str, body: dict | None = None):
+        """Tell the running server about a change; fine if it is stopped (it reads the files on start)."""
+        try:
+            return httpx.post(f"{self._base()}{path}", json=body or {}, timeout=1.5)
+        except Exception:
+            return None
+
+    def get_games(self):
+        from cyno import games
+
+        return {
+            "settings": games.load_settings(),
+            "games": [{"id": g, "title": t, "about": about, "voice": voice} for g, (t, about, voice) in games.GAMES.items()],
+            "pictures": games.puzzle_files(),
+            "best": games.best_today(),
+        }
+
+    def save_games(self, changes: dict):
+        from cyno import games
+
+        settings = games.save_settings(changes)
+        self._notify("/api/games/reload")
+        return {"ok": True, "settings": settings}
+
+    def add_puzzle_pictures(self):
+        from cyno import games
+
+        picked = webview.windows[0].create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=True, file_types=("Pictures (*.png;*.jpg;*.jpeg;*.webp)",)
+        )
+        if not picked:
+            return {"ok": True, "pictures": games.puzzle_files()}
+        try:
+            for path in picked:
+                games.add_puzzle_image(Path(path))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        self._notify("/api/games/reload")
+        return {"ok": True, "pictures": games.puzzle_files()}
+
+    def remove_puzzle_picture(self, name: str):
+        from cyno import games
+
+        games.remove_puzzle_image(name)
+        self._notify("/api/games/reload")
+        return {"ok": True, "pictures": games.puzzle_files()}
+
+    def puzzle_picture_data(self, name: str):
+        """Small preview for the list (the app window can't load files from the data folder directly)."""
+        import base64
+        from cyno import games
+
+        path = games.PUZZLE_DIR / Path(name).name
+        if not path.is_file() or path.stat().st_size > 12_000_000:
+            return {"ok": False}
+        kind = {"png": "png", "webp": "webp"}.get(path.suffix.lower().lstrip("."), "jpeg")
+        return {"ok": True, "src": f"data:image/{kind};base64," + base64.b64encode(path.read_bytes()).decode()}
+
+    def open_game_content(self):
+        from cyno import games
+
+        _open_path(games.CONTENT_PATH)
+        return {"ok": True}
+
+    # ---------- microphone, speaker, camera ----------
+
+    def get_devices(self):
+        from cyno import devices
+
+        data = self._get(f"{self._base()}/api/devices")
+        if data and "seen" in data:
+            return {"running": True, **data}
+        return {"running": False, "seen": {k: [] for k in devices.KINDS}, "chosen": devices.load()}
+
+    def set_devices(self, choice: dict):
+        from cyno import devices
+
+        r = self._notify("/api/devices", choice)
+        if r is not None and r.status_code == 200:
+            return {"ok": True, "live": True, "chosen": r.json()}
+        return {"ok": True, "live": False, "chosen": devices.save(choice)}
+
+    def scan_devices(self):
+        r = self._notify("/api/devices/scan")
+        if r is None:
+            return {"ok": False, "error": "Start Cyno and open the chest screen first."}
+        return {"ok": True}
+
+    # ---------- locked chest screen ----------
+
+    def kiosk_status(self):
+        from cyno import kiosk
+
+        live = self._get(f"{self._base()}/api/kiosk")
+        if live and "open" in live:
+            return {"running": True, **live}
+        return {"running": False, "has_pin": kiosk.has_pin(), "open": False, "browser": bool(kiosk.find_browser())}
+
+    def set_kiosk_pin(self, pin: str):
+        from cyno import kiosk
+
+        try:
+            kiosk.set_pin(pin)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True}
+
+    def _kiosk(self, action: str):
+        from cyno import kiosk
+
+        try:
+            r = httpx.post(f"{self._base()}/api/kiosk/{action}", json={"token": kiosk.read_token()}, timeout=6)
+        except Exception:
+            return {"ok": False, "error": "Start Cyno first."}
+        if r.status_code != 200:
+            return {"ok": False, "error": r.text or "Could not do that."}
+        return {"ok": True, **r.json()}
+
+    def open_kiosk(self):
+        return self._kiosk("open")
+
+    def close_kiosk(self):
+        return self._kiosk("close")
+
     def open_display(self, page: str):
         webbrowser.open(f"{self._base()}/{'face' if page == 'face' else 'chest'}/")
         return {"ok": True}
@@ -305,10 +448,11 @@ class Api:
 
         return {**assistant.load(), "default_greeting": assistant.DEFAULTS["greeting"]}
 
-    def save_assistant(self, greeting: str, instructions: str, strict: bool = True, on_topic: bool = False):
+    def save_assistant(self, greeting: str, instructions: str, strict: bool = True, on_topic: bool = False,
+                       social: bool | None = None):
         from cyno import assistant
 
-        assistant.save(greeting, instructions, strict, on_topic)
+        assistant.save(greeting, instructions, strict, on_topic, social)
         try:  # record the new greeting now, so the next visitor already hears it
             httpx.post(f"{self._base()}/api/greeting/prepare", timeout=1.0)
         except Exception:

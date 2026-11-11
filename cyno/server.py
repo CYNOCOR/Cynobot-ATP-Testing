@@ -27,7 +27,7 @@ from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCRequestHandler,
 )
 
-from cyno import greeting, knowledge, offline_models
+from cyno import devices, display, games, greeting, kiosk, knowledge, offline_models
 from cyno.bus import StateBus
 from cyno.voice import run_voice_session
 
@@ -38,6 +38,8 @@ CHEST_DIR = ROOT / "web" / "chest"
 load_dotenv(ROOT.parent / ".env", override=True)
 
 bus = StateBus()
+bus.state["face_frame"] = display.load_frame()  # glow-ring alignment for the head screen
+bus.state["devices"] = devices.load()  # chosen mic / speaker / camera names ("" = default)
 webrtc = SmallWebRTCRequestHandler()
 
 
@@ -45,7 +47,9 @@ webrtc = SmallWebRTCRequestHandler()
 async def lifespan(app: FastAPI):
     offline_models.start_preload()  # background thread; server is usable immediately
     asyncio.create_task(greeting.prepare())  # record the online greeting once
+    kiosk.publish_token()  # lets Cyno Control open and close the locked chest screen
     yield
+    kiosk.close()  # don't leave a locked window behind when Cyno stops
     await webrtc.close()
 
 
@@ -106,6 +110,115 @@ if os.getenv("CYNO_DEBUG") == "1":
 
         await simulate_outage(bool(body.get("blocked")))
         return {"gemini_blocked": bool(body.get("blocked"))}
+
+
+@app.get("/api/face-frame")
+async def get_face_frame():
+    return bus.state["face_frame"]
+
+
+@app.post("/api/face-frame")
+async def set_face_frame(frame: dict):
+    """Cyno Control's alignment sliders: save and move the face's glow ring live."""
+    frame = display.save_frame({**bus.state["face_frame"], **frame})
+    await bus.update(face_frame=frame)
+    return frame
+
+
+# ---- games (chest screen) ----
+
+
+@app.get("/api/games")
+async def get_games():
+    from cyno.voice import is_online
+
+    online = bool(os.getenv("GOOGLE_API_KEY")) and await is_online(1.0)
+    return games.public_config(online)
+
+
+@app.post("/api/games/score")
+async def post_game_score(body: dict):
+    try:
+        return games.submit_score(str(body.get("game")), str(body.get("level", "")), body.get("score", 0))
+    except (ValueError, TypeError) as e:
+        return Response(str(e), status_code=400)
+
+
+@app.post("/api/games/reload")
+async def reload_games():
+    """Cyno Control changed the game settings or pictures: tell the chest to re-read them."""
+    import time
+
+    await bus.update(games_rev=int(time.time() * 1000))
+    return {"ok": True}
+
+
+# ---- mic / speaker / camera choice ----
+
+
+@app.get("/api/devices")
+async def get_devices():
+    return {"seen": devices.seen, "chosen": bus.state["devices"]}
+
+
+@app.post("/api/devices/seen")
+async def devices_seen(found: dict):
+    """The chest page reports the devices its browser can use."""
+    return devices.report(found)
+
+
+@app.post("/api/devices")
+async def set_devices(choice: dict):
+    chosen = devices.save(choice)
+    await bus.update(devices=chosen)
+    return chosen
+
+
+@app.post("/api/devices/scan")
+async def scan_devices():
+    """Ask the chest page to look for devices again (it may ask for camera permission once)."""
+    import time
+
+    await bus.update(device_scan=int(time.time() * 1000))
+    return {"ok": True}
+
+
+# ---- locked chest screen (kiosk + PIN) ----
+
+
+@app.get("/api/kiosk")
+async def kiosk_status():
+    return kiosk.status()
+
+
+@app.post("/api/kiosk/open")
+async def kiosk_open(body: dict):
+    """From Cyno Control: open the chest screen in a locked, full-screen browser window."""
+    if not kiosk.token_ok(body.get("token", "")):
+        return Response("Not allowed", status_code=403)
+    try:
+        kiosk.open_locked(f"http://localhost:{os.getenv('PORT', '7860')}/chest/?kiosk=1")
+    except ValueError as e:
+        return Response(str(e), status_code=400)
+    return kiosk.status()
+
+
+@app.post("/api/kiosk/close")
+async def kiosk_close(body: dict):
+    """From Cyno Control (no PIN needed there)."""
+    if not kiosk.token_ok(body.get("token", "")):
+        return Response("Not allowed", status_code=403)
+    kiosk.close()
+    return kiosk.status()
+
+
+@app.post("/api/kiosk/unlock")
+async def kiosk_unlock(body: dict):
+    """From the PIN pad on the chest screen: the right PIN closes the locked window."""
+    result = kiosk.check_pin(str(body.get("pin", "")))
+    if result["ok"]:
+        asyncio.get_running_loop().call_later(0.6, kiosk.close)  # let the page show "Unlocked" first
+    return result
 
 
 @app.post("/api/greeting/prepare")

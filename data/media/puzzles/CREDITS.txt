@@ -1,0 +1,44 @@
+Picture Puzzle images, from Wikimedia Commons.
+Keep this file with the pictures: the CC BY and CC BY-SA ones require credit.
+
+astronaut-cupola.jpg
+  "Tracy Caldwell Dyson in Cupola ISS.jpg" by NASA/Tracy Caldwell Dyson
+  Licence: Public domain  
+  Source: https://commons.wikimedia.org/wiki/File:Tracy_Caldwell_Dyson_in_Cupola_ISS.jpg
+  Change made: resized to 1600x1063
+
+green-circuit-board.jpg
+  "Green circuit board II (2389301870).jpg" by Peter Shanks from Hobart, Australia
+  Licence: CC BY 2.0  https://creativecommons.org/licenses/by/2.0
+  Source: https://commons.wikimedia.org/wiki/File:Green_circuit_board_II_(2389301870).jpg
+  Change made: resized to 1600x1200
+
+macro-circuit-board.jpg
+  "Macro circuit board.JPG" by Ingo Dierking
+  Licence: CC BY-SA 4.0  https://creativecommons.org/licenses/by-sa/4.0
+  Source: https://commons.wikimedia.org/wiki/File:Macro_circuit_board.JPG
+  Change made: resized to 1600x1067
+
+robot-arm-painting.jpg
+  "KUKA industrial robotic arm performing "The Beach" by Roy Nachum - 02.jpg" by Oleg Yunakov
+  Licence: CC BY-SA 4.0  https://creativecommons.org/licenses/by-sa/4.0
+  Source: https://commons.wikimedia.org/wiki/File:KUKA_industrial_robotic_arm_performing_%22The_Beach%22_by_Roy_Nachum_-_02.jpg
+  Change made: resized to 1600x1200
+
+rocket-launch.jpg
+  "CRS-9 mission (28348649546).jpg" by SpaceX
+  Licence: CC0  http://creativecommons.org/publicdomain/zero/1.0/deed.en
+  Source: https://commons.wikimedia.org/wiki/File:CRS-9_mission_(28348649546).jpg
+  Change made: resized to 1600x1067
+
+space-station.jpg
+  "STS-134 International Space Station after undocking.jpg" by NASA
+  Licence: Public domain  
+  Source: https://commons.wikimedia.org/wiki/File:STS-134_International_Space_Station_after_undocking.jpg
+  Change made: resized to 1600x1063
+
+spacewalk.jpg
+  "Piers Sellers spacewalk.jpg" by NASA, Astronaut Michael Edward Fossum
+  Licence: Public domain  
+  Source: https://commons.wikimedia.org/wiki/File:Piers_Sellers_spacewalk.jpg
+  Change made: resized to 1600x1059

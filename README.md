@@ -52,7 +52,24 @@ It runs everything without a terminal:
   **Answer rules:** *Strict answers* (on by default) makes Cyno use only confirmed facts, never guess
   names, numbers or directions, and say "I'm not sure, please check with the front desk" when facts are missing
   or disagree; it also lowers the model's temperature. *Stay on topic* makes it decline non-IIT questions.
+  *Social chat* (on by default) lets Cyno do friendly small talk and clean jokes. It keeps safety limits: no
+  politics, religion, romance, insults or personal details, no made-up time, weather or news, and help for upset
+  visitors. Campus facts still follow the strict rules. Turn it off for receptionist-only answers.
   The fact editor warns when a new fact overlaps existing ones, which is where contradictions start.
+- **Games** (own page in Cyno Control): short games on the chest screen, opened with the Games button or by
+  saying "play a game". Brain Riddles, Memory Match, Picture Puzzle and Find Your Degree are tap games and work
+  offline; Word Chain is played by voice and is hidden when Cynobot is offline. Each game has an on/off switch,
+  plus a master switch. A game ends at the time limit (default 2 minutes) and a tap game closes after 30 seconds
+  with no touch. Today's best per game is kept with no names (`data/game_scores.json`). Riddles and the degree
+  quiz live in `data/game_content.json`; puzzle pictures are added on the Games page (`data/media/puzzles/`).
+- **Devices** (Controls page): choose the microphone, speaker and camera Cynobot uses. Press *Find devices* with
+  the chest screen open and allow the mic and camera once. Only Cynobot is affected, not the computer's sound
+  settings, and it works the same on macOS and Windows (choosing a speaker needs Chrome or Edge).
+- **Locked chest screen** (Controls page): set a 4 to 8 digit staff PIN, then *Open locked* opens the chest
+  screen in Chrome or Edge kiosk mode: full screen, no close button, tabs or address bar. Staff tap the CYNOBOT
+  logo three times, then hold it for 10 seconds (a countdown shows), and enter the PIN to close it (five wrong tries lock the pad for a minute), or use *Unlock and close* in
+  Cyno Control. The PIN is stored only as a salted hash in `data/kiosk.json`. A keyboard can still quit a kiosk
+  browser (Alt+F4 / Cmd+Q), so don't leave one attached to the robot.
 - **Appearance:** Auto / Light / Dark switch at the bottom of the sidebar (remembered on this computer).
 - **Controls:** open the chest/face displays, set the face expression and color, start Ollama, run the speed
   benchmark, and simulate a Wi-Fi drop.

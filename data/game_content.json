@@ -1,0 +1,606 @@
+{
+  "_note": "Riddles: level is easy or medium; answer is the position of the right option, starting at 0. Degree: programme names should match the knowledge base.",
+  "riddles": [
+    {
+      "level": "easy",
+      "q": "What has hands but cannot clap?",
+      "options": [
+        "A clock",
+        "A robot",
+        "A tree",
+        "A fish"
+      ],
+      "answer": 0,
+      "why": "A clock has hands that point to the time."
+    },
+    {
+      "level": "easy",
+      "q": "What has to be broken before you can use it?",
+      "options": [
+        "A phone",
+        "An egg",
+        "A pencil",
+        "A door"
+      ],
+      "answer": 1,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "I'm tall when I'm young and short when I'm old. What am I?",
+      "options": [
+        "A tree",
+        "A candle",
+        "A giraffe",
+        "A building"
+      ],
+      "answer": 1,
+      "why": "A candle gets shorter as it burns."
+    },
+    {
+      "level": "easy",
+      "q": "What has many keys but can't open a single door?",
+      "options": [
+        "A keyboard",
+        "A map",
+        "A lock",
+        "A car"
+      ],
+      "answer": 0,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "What comes next: 2, 4, 6, 8, ...?",
+      "options": [
+        "9",
+        "10",
+        "12",
+        "16"
+      ],
+      "answer": 1,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "What gets wetter the more it dries?",
+      "options": [
+        "Rain",
+        "A towel",
+        "The sun",
+        "Soap"
+      ],
+      "answer": 1,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "Which one is the odd one out?",
+      "options": [
+        "Apple",
+        "Banana",
+        "Carrot",
+        "Mango"
+      ],
+      "answer": 2,
+      "why": "A carrot is a vegetable; the others are fruits."
+    },
+    {
+      "level": "easy",
+      "q": "What has a face and two hands but no arms or legs?",
+      "options": [
+        "A clock",
+        "A doll",
+        "A coin",
+        "A robot"
+      ],
+      "answer": 0,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "What has one eye but cannot see?",
+      "options": [
+        "A needle",
+        "A potato",
+        "A storm",
+        "A fish"
+      ],
+      "answer": 0,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "How many legs do two cats and one bird have altogether?",
+      "options": [
+        "8",
+        "10",
+        "12",
+        "6"
+      ],
+      "answer": 1,
+      "why": "Two cats have 8 legs and one bird has 2."
+    },
+    {
+      "level": "easy",
+      "q": "What goes up but never comes down?",
+      "options": [
+        "A ball",
+        "Your age",
+        "A kite",
+        "Smoke"
+      ],
+      "answer": 1,
+      "why": ""
+    },
+    {
+      "level": "easy",
+      "q": "Which shape has three sides?",
+      "options": [
+        "Square",
+        "Circle",
+        "Triangle",
+        "Hexagon"
+      ],
+      "answer": 2,
+      "why": ""
+    },
+    {
+      "level": "medium",
+      "q": "What comes next: 1, 1, 2, 3, 5, 8, ...?",
+      "options": [
+        "11",
+        "12",
+        "13",
+        "15"
+      ],
+      "answer": 2,
+      "why": "Each number is the sum of the two before it."
+    },
+    {
+      "level": "medium",
+      "q": "I speak without a mouth and hear without ears. What am I?",
+      "options": [
+        "An echo",
+        "A robot",
+        "A radio",
+        "A shadow"
+      ],
+      "answer": 0,
+      "why": ""
+    },
+    {
+      "level": "medium",
+      "q": "A farmer has 17 sheep and all but 9 run away. How many are left?",
+      "options": [
+        "8",
+        "9",
+        "17",
+        "0"
+      ],
+      "answer": 1,
+      "why": "'All but 9' means 9 stayed."
+    },
+    {
+      "level": "medium",
+      "q": "What is 1010 in binary as an ordinary number?",
+      "options": [
+        "5",
+        "8",
+        "10",
+        "12"
+      ],
+      "answer": 2,
+      "why": "8 + 2 = 10."
+    },
+    {
+      "level": "medium",
+      "q": "The more you take, the more you leave behind. What are they?",
+      "options": [
+        "Footsteps",
+        "Photos",
+        "Coins",
+        "Breaths"
+      ],
+      "answer": 0,
+      "why": ""
+    },
+    {
+      "level": "medium",
+      "q": "If two robots build two toys in two minutes, how long does one robot take to build one toy?",
+      "options": [
+        "1 minute",
+        "2 minutes",
+        "4 minutes",
+        "30 seconds"
+      ],
+      "answer": 1,
+      "why": "Each robot builds one toy in two minutes."
+    },
+    {
+      "level": "medium",
+      "q": "Which number is missing: 3, 9, 27, ?, 243",
+      "options": [
+        "54",
+        "81",
+        "72",
+        "108"
+      ],
+      "answer": 1,
+      "why": "Each number is multiplied by 3."
+    },
+    {
+      "level": "medium",
+      "q": "What can travel around the world while staying in a corner?",
+      "options": [
+        "A stamp",
+        "The wind",
+        "A satellite",
+        "A shadow"
+      ],
+      "answer": 0,
+      "why": ""
+    },
+    {
+      "level": "medium",
+      "q": "What has cities but no houses, forests but no trees, and water but no fish?",
+      "options": [
+        "A dream",
+        "A map",
+        "A painting",
+        "A desert"
+      ],
+      "answer": 1,
+      "why": ""
+    },
+    {
+      "level": "medium",
+      "q": "A bat and a ball cost 110 rupees. The bat costs 100 rupees more than the ball. How much is the ball?",
+      "options": [
+        "10 rupees",
+        "5 rupees",
+        "15 rupees",
+        "1 rupee"
+      ],
+      "answer": 1,
+      "why": "Ball 5, bat 105: together 110."
+    },
+    {
+      "level": "medium",
+      "q": "Which word is spelled the same forwards and backwards?",
+      "options": [
+        "Robot",
+        "Level",
+        "Laser",
+        "Pixel"
+      ],
+      "answer": 1,
+      "why": ""
+    },
+    {
+      "level": "medium",
+      "q": "You see a boat full of people, yet there isn't a single person on board. How?",
+      "options": [
+        "They are all married",
+        "It is a toy boat",
+        "They are robots",
+        "It is night"
+      ],
+      "answer": 0,
+      "why": ""
+    }
+  ],
+  "degree": {
+    "levels": [
+      {
+        "id": "foundation",
+        "label": "I've finished my O/Levels"
+      },
+      {
+        "id": "undergraduate",
+        "label": "I've finished (or I'm doing) my A/Levels"
+      },
+      {
+        "id": "postgraduate",
+        "label": "I already have a degree"
+      }
+    ],
+    "questions": [
+      {
+        "q": "On a free afternoon, what sounds most fun?",
+        "options": [
+          {
+            "label": "Building an app or a game",
+            "tags": {
+              "code": 2
+            }
+          },
+          {
+            "label": "Finding patterns in numbers",
+            "tags": {
+              "data": 2
+            }
+          },
+          {
+            "label": "Teaching a machine a new trick",
+            "tags": {
+              "ai": 2
+            }
+          },
+          {
+            "label": "Planning a small business",
+            "tags": {
+              "business": 2
+            }
+          }
+        ]
+      },
+      {
+        "q": "Your friends would say you are...",
+        "options": [
+          {
+            "label": "The problem solver",
+            "tags": {
+              "code": 1,
+              "ai": 1
+            }
+          },
+          {
+            "label": "The organiser and leader",
+            "tags": {
+              "business": 2
+            }
+          },
+          {
+            "label": "The curious one who asks why",
+            "tags": {
+              "data": 1,
+              "ai": 1
+            }
+          },
+          {
+            "label": "The careful one who spots mistakes",
+            "tags": {
+              "security": 2,
+              "code": 1
+            }
+          }
+        ]
+      },
+      {
+        "q": "Which headline would you click first?",
+        "options": [
+          {
+            "label": "A robot learns to cook",
+            "tags": {
+              "ai": 2
+            }
+          },
+          {
+            "label": "A start-up grows from a garage",
+            "tags": {
+              "business": 2,
+              "money": 1
+            }
+          },
+          {
+            "label": "Hackers stopped just in time",
+            "tags": {
+              "security": 2
+            }
+          },
+          {
+            "label": "How data predicted the cricket final",
+            "tags": {
+              "data": 2
+            }
+          }
+        ]
+      },
+      {
+        "q": "In a group project, you'd rather...",
+        "options": [
+          {
+            "label": "Write the code that makes it work",
+            "tags": {
+              "code": 2
+            }
+          },
+          {
+            "label": "Present it and win people over",
+            "tags": {
+              "business": 2
+            }
+          },
+          {
+            "label": "Dig through the research and numbers",
+            "tags": {
+              "data": 2,
+              "money": 1
+            }
+          },
+          {
+            "label": "Design something clever and new",
+            "tags": {
+              "ai": 1,
+              "design": 2
+            }
+          }
+        ]
+      },
+      {
+        "q": "Pick a dream job.",
+        "options": [
+          {
+            "label": "Software engineer",
+            "tags": {
+              "code": 3
+            }
+          },
+          {
+            "label": "AI or robotics engineer",
+            "tags": {
+              "ai": 3
+            }
+          },
+          {
+            "label": "Data or finance analyst",
+            "tags": {
+              "data": 2,
+              "money": 2
+            }
+          },
+          {
+            "label": "Founder or manager",
+            "tags": {
+              "business": 3
+            }
+          }
+        ]
+      }
+    ],
+    "programmes": {
+      "foundation": [
+        {
+          "name": "Foundation Diploma in Computing",
+          "tags": {
+            "code": 2,
+            "ai": 2,
+            "data": 1,
+            "security": 2
+          },
+          "why": "You like making and fixing things with technology."
+        },
+        {
+          "name": "Foundation Diploma in Business Technology",
+          "tags": {
+            "data": 2,
+            "money": 2,
+            "business": 1,
+            "code": 1
+          },
+          "why": "You enjoy both technology and how organisations use it."
+        },
+        {
+          "name": "Foundation Diploma in Business Management",
+          "tags": {
+            "business": 3,
+            "design": 1
+          },
+          "why": "You like leading, planning and working with people."
+        }
+      ],
+      "undergraduate": [
+        {
+          "name": "Software Engineering",
+          "tags": {
+            "code": 3,
+            "security": 1
+          },
+          "why": "You love building things that work."
+        },
+        {
+          "name": "Computer Science",
+          "tags": {
+            "code": 2,
+            "security": 2,
+            "ai": 1
+          },
+          "why": "You enjoy solving hard problems and knowing how things work underneath."
+        },
+        {
+          "name": "Artificial Intelligence and Data Science",
+          "tags": {
+            "ai": 3,
+            "data": 2
+          },
+          "why": "You're curious about smart machines and what data can tell us."
+        },
+        {
+          "name": "Business Data Analytics",
+          "tags": {
+            "data": 3,
+            "business": 1,
+            "money": 1
+          },
+          "why": "You like finding the story hidden in the numbers."
+        },
+        {
+          "name": "Fintech with Data Analytics",
+          "tags": {
+            "money": 3,
+            "data": 2
+          },
+          "why": "You're interested in money, markets and technology together."
+        },
+        {
+          "name": "Business Computing",
+          "tags": {
+            "business": 2,
+            "code": 2
+          },
+          "why": "You like technology and business in equal measure."
+        },
+        {
+          "name": "Business Management",
+          "tags": {
+            "business": 3,
+            "design": 1
+          },
+          "why": "You're a natural organiser and leader."
+        }
+      ],
+      "postgraduate": [
+        {
+          "name": "MSc Advanced Software Engineering",
+          "tags": {
+            "code": 3
+          },
+          "why": "You want to go deeper into building great software."
+        },
+        {
+          "name": "MSc Applied Artificial Intelligence",
+          "tags": {
+            "ai": 3,
+            "design": 1
+          },
+          "why": "You want to put AI to work on real problems."
+        },
+        {
+          "name": "MSc Big Data Analytics",
+          "tags": {
+            "data": 3
+          },
+          "why": "You enjoy making sense of very large amounts of data."
+        },
+        {
+          "name": "MSc Business Analytics",
+          "tags": {
+            "data": 2,
+            "business": 2,
+            "money": 2
+          },
+          "why": "You like using data to make better business decisions."
+        },
+        {
+          "name": "MSc Cyber Security and Forensics",
+          "tags": {
+            "security": 3,
+            "code": 1
+          },
+          "why": "You're careful, sharp and like keeping systems safe."
+        },
+        {
+          "name": "MSc Information Technology",
+          "tags": {
+            "code": 1,
+            "business": 1,
+            "ai": 1,
+            "data": 1
+          },
+          "why": "You want a broad, practical step up in technology."
+        }
+      ]
+    }
+  }
+}

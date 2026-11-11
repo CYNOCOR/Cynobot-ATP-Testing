@@ -11,6 +11,7 @@ show THINKING / SPEAKING / captions in sync with the audio.
 import asyncio
 import os
 import re
+import time
 
 from loguru import logger
 
@@ -68,8 +69,11 @@ is not in the facts, say you are not sure and suggest asking the staff at the fr
 Never invent rooms, names, times or phone numbers.
 Your chest screen shows the matching fact while you talk; the list after the facts says which
 facts come with a picture or QR code. When a visitor asks to see a map, picture or QR code that
-a fact has, tell them it is on your chest screen (for example, "Here's the map on my screen,
-and you can scan the code for directions"). Do not send them to the front desk for it.
+a fact has, tell them it is on your chest screen. Do not send them to the front desk for it.
+When you mention a QR code, say what that fact's code does, exactly as the list says: an email
+code is for emailing, a website code opens the website, and only a directions code gives
+directions (for example, "Here's the map on my screen, and the code gives you directions", or
+"Scan the code on my screen to email admissions").
 That list is a note for you: never read it, its brackets or its wording aloud.
 Do not end every reply with "Is there anything else I can help you with?"; ask it rarely.
 
@@ -214,7 +218,14 @@ class DisplayObserver(BaseObserver):
             self._user_text = f"{self._user_text} {frame.text}".strip()
             self._new_bot_turn = True
             # A new question clears the old card; the next one is chosen from Cynobot's answer.
-            await self._bus.update(expression="THINKING", flow_step="CONVERSE", user_text=self._user_text, card=None)
+            changes = {"expression": "THINKING", "flow_step": "CONVERSE", "user_text": self._user_text, "card": None}
+            # "Let's play a game" / "word chain": the chest opens it (Cynobot just says it is open).
+            from cyno import games
+
+            wanted = games.voice_request(frame.text, online=self._bus.state.get("voice_mode") != "OFFLINE")
+            if wanted:
+                changes["game_request"] = {"id": wanted, "ts": int(time.time() * 1000)}
+            await self._bus.update(**changes)
 
         elif isinstance(frame, TTSTextFrame):
             if self._new_bot_turn:
@@ -248,8 +259,15 @@ class DisplayObserver(BaseObserver):
             await self._bus.update(expression="IDLE")
 
 
-def _facts_prompt() -> str:
-    return PERSONA + FACT_RULES.format(facts=knowledge.as_prompt(confirmed_only=assistant.load()["strict"])) + assistant.instructions_block()
+def _facts_prompt(online: bool = True) -> str:
+    from cyno import games
+
+    return (
+        PERSONA
+        + FACT_RULES.format(facts=knowledge.as_prompt(confirmed_only=assistant.load()["strict"]))
+        + games.prompt_block(online)  # Word Chain needs the online brain
+        + assistant.instructions_block()
+    )
 
 
 def _build_online(transport, recorded_greeting: bool):
@@ -332,7 +350,7 @@ def _build_offline(transport):
             model=offline_models.ollama_model_name(),
             max_tokens=90,  # keep spoken answers short; long ones are slow on a CPU-only laptop
             temperature=assistant.temperature(),
-            system_instruction=_facts_prompt(),
+            system_instruction=_facts_prompt(online=False),
         ),
     )
     class SpokenNamesKokoro(KokoroTTSService):
@@ -341,6 +359,10 @@ def _build_offline(transport):
 
         async def run_tts(self, text, context_id):
             text = re.sub(r"(?i)cyno(?=cor|bot)", "Saino", text)
+            # The small offline model sometimes adds stage directions like *wink* to jokes.
+            text = re.sub(r"\*[^*]{1,30}\*", "", text).replace("*", "")
+            if not text.strip():
+                return
             async for frame in super().run_tts(text, context_id):
                 yield frame
 

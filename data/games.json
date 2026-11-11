@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "games": {
+    "riddles": true,
+    "memory": true,
+    "puzzle": true,
+    "degree": true,
+    "wordchain": true
+  },
+  "time_limit_secs": 120,
+  "idle_secs": 30
+}
