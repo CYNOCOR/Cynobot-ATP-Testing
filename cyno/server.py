@@ -1,6 +1,6 @@
 """Cyno brain server.
 
-  /face/   head display (existing Facial Expression Demo, unchanged layout)
+  /face/   head display (cyno/web/face)
   /chest/  chest touchscreen: holds the mic/speaker WebRTC link + captions/cards
   /ws      state bus for both displays
   /api/offer  WebRTC signalling for the voice pipeline
@@ -32,13 +32,17 @@ from cyno.bus import StateBus
 from cyno.voice import run_voice_session
 
 ROOT = Path(__file__).resolve().parent
-FACE_DIR = ROOT.parent.parent / "Facial Expression Demo"
+# The face page ships inside this project, so it is there on every computer the code is
+# copied to. (It used to be read from a "Facial Expression Demo" folder beside cyno-brain,
+# which a fresh copy on another laptop did not have: the server then failed to start.)
+FACE_DIR = ROOT / "web" / "face"
 CHEST_DIR = ROOT / "web" / "chest"
 
 load_dotenv(ROOT.parent / ".env", override=True)
 
 bus = StateBus()
 bus.state["face_frame"] = display.load_frame()  # glow-ring alignment for the head screen
+bus.state["chest_scene"] = display.load_scene()  # particle background: auto / full / light / off
 bus.state["devices"] = devices.load()  # chosen mic / speaker / camera names ("" = default)
 webrtc = SmallWebRTCRequestHandler()
 
@@ -123,6 +127,50 @@ async def set_face_frame(frame: dict):
     frame = display.save_frame({**bus.state["face_frame"], **frame})
     await bus.update(face_frame=frame)
     return frame
+
+
+@app.post("/api/chest-scene")
+async def set_chest_scene(body: dict):
+    """Cyno Control: how much 3D the chest screen draws (applies at once)."""
+    try:
+        value = display.save_scene(str(body.get("value")))
+    except ValueError as e:
+        return Response(str(e), status_code=400)
+    await bus.update(chest_scene=value)
+    return {"value": value}
+
+
+@app.get("/api/chest-stats")
+async def get_chest_stats():
+    import time
+
+    stats = dict(display.chest_stats)
+    if stats:
+        stats["age_secs"] = int(time.time() - stats.pop("at", 0))
+    return {"scene": bus.state["chest_scene"], "stats": stats}
+
+
+@app.post("/api/chest-stats")
+async def post_chest_stats(body: dict):
+    """The chest page reports its own frame rate every few seconds."""
+    import time
+
+    keep = {k: body[k] for k in ("fps", "particles", "quality", "renderer", "scene", "bench") if k in body}
+    display.chest_stats.clear()
+    display.chest_stats.update(keep, at=time.time())
+    return {"ok": True}
+
+
+@app.get("/api/card/{fact_id}")
+async def get_card(fact_id: str):
+    """A fact's chest card, for the tap shortcuts on the home screen (works with no conversation)."""
+    from cyno import assistant
+
+    strict = assistant.load()["strict"]
+    for entry in knowledge._entries(confirmed_only=strict):
+        if entry["id"] == fact_id:
+            return knowledge.card(entry)
+    return Response("Unknown fact", status_code=404)
 
 
 # ---- games (chest screen) ----

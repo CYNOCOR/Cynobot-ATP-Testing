@@ -26,7 +26,7 @@ and relax the "Always reply in English" rule in `cyno/voice.py`.
 
 ## Quick install (teammates start here)
 
-Copy the **whole `BOT` folder** (`cyno-brain` needs `Facial Expression Demo` next to it). Then, with internet on:
+Copy the **`cyno-brain` folder** (or clone it). It holds everything, including both screens' pages. Then, with internet on:
 
 | | Install (once, ~15–30 min) | Start the robot |
 |---|---|---|
@@ -70,6 +70,13 @@ It runs everything without a terminal:
   logo three times, then hold it for 10 seconds (a countdown shows), and enter the PIN to close it (five wrong tries lock the pad for a minute), or use *Unlock and close* in
   Cyno Control. The PIN is stored only as a salted hash in `data/kiosk.json`. A keyboard can still quit a kiosk
   browser (Alt+F4 / Cmd+Q), so don't leave one attached to the robot.
+- **Chest screen design:** a particle scene (`particles.js`, plain WebGL, no downloads) sits behind minimal glass:
+  a ribbon when idle, a ring that ripples with the visitor's voice, a swirl while thinking, a wave while answering,
+  and a line drawing for the topic before its card. Facts pick their drawing automatically, or in the fact editor.
+  The home screen has tap shortcuts (Find us, Courses, Apply, Games) that show a fact's card with no conversation.
+  *Controls > Displays > Chest background* sets how much it draws (Automatic, Full, Light, Off) and shows the
+  frame rate the chest screen reports. With no 3D in the browser the page uses a plain background by itself.
+  The previous design is kept at `/chest/classic.html`.
 - **Appearance:** Auto / Light / Dark switch at the bottom of the sidebar (remembered on this computer).
 - **Controls:** open the chest/face displays, set the face expression and color, start Ollama, run the speed
   benchmark, and simulate a Wi-Fi drop.

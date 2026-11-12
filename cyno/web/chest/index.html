@@ -4,174 +4,290 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cynobot — Chest Display</title>
+  <!-- The chest screen: a particle scene (particles.js) behind minimal glass. It holds the
+       voice link, captions, info cards, tap shortcuts, games, device choice and the staff PIN
+       lock. The previous design is kept at classic.html in case it is ever needed. -->
   <style>
-    /* Apple-style: system type in two weights, glass surfaces, one accent (the face colour),
-       spring motion that settles quickly. Cards swap with a blur-and-scale cross-fade and
-       reveal their parts in a short stagger; photos drift slowly while shown. */
     :root {
-      --accent: #ff3b4e;
-      --accent-rgb: 255, 59, 78;
-      --bg: #0a0405;
-      --glass: rgba(34, 18, 21, 0.55);
-      --glass-edge: rgba(255, 255, 255, 0.09);
-      --text: #f8eef0;
-      --muted: rgba(248, 238, 240, 0.62);
-      --spring: cubic-bezier(0.2, 0.9, 0.25, 1.05);
-      --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+      --accent: #ff3b4e; --accent-rgb: 255, 59, 78;
+      --bg: #05050a;
+      --glass: rgba(255, 255, 255, 0.06); --glass-edge: rgba(255, 255, 255, 0.14);
+      --text: #f4f2f8; --muted: rgba(244, 242, 248, 0.56);
+      --spring: cubic-bezier(0.2, 0.9, 0.25, 1.05); --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
     }
-    body.theme-blue {
-      --accent: #2ad8ff;
-      --accent-rgb: 42, 216, 255;
-      --bg: #03080e;
-      --glass: rgba(16, 28, 42, 0.55);
-    }
+    body.theme-blue { --accent: #2ad8ff; --accent-rgb: 42, 216, 255; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100vw; height: 100vh; overflow: hidden; user-select: none;
-      background: var(--bg); color: var(--text);
+    html, body { width: 100vw; height: 100vh; overflow: hidden; user-select: none; -webkit-user-select: none; background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
-    }
-    /* Soft moving light behind everything, tinted by the face colour. */
-    .ambient { position: fixed; inset: -20%; z-index: 0; pointer-events: none;
-      background:
-        radial-gradient(40% 35% at 30% 20%, rgba(var(--accent-rgb), 0.22), transparent 70%),
-        radial-gradient(35% 30% at 75% 80%, rgba(var(--accent-rgb), 0.12), transparent 70%);
-      filter: blur(40px); animation: drift 24s var(--ease) infinite alternate; transition: background 0.6s; }
+      -webkit-font-smoothing: antialiased; }
+    #stage { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    .hidden { display: none !important; }
+    /* Plain background: used when 3D is switched off in Cyno Control, or the browser has none.
+       Two soft lights in the face colour that drift slowly; costs almost nothing to draw. */
+    body.plain #stage { display: none; }
+    body.plain::before { content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none; filter: blur(50px);
+      background: radial-gradient(38% 34% at 32% 26%, rgba(var(--accent-rgb), 0.24), transparent 70%), radial-gradient(34% 30% at 72% 78%, rgba(120, 110, 255, 0.16), transparent 70%);
+      animation: drift 26s var(--ease) infinite alternate; }
     @keyframes drift { to { transform: translate3d(4%, -3%, 0) scale(1.08); } }
+    /* A game is open: the scene stays, the conversation screen steps out. */
+    body.games-open .shell, body.games-open .card-wrap { visibility: hidden; }
 
-    .shell { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; padding: 24px 40px 28px; gap: 16px; }
-
+    .shell { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; padding: 26px 40px 30px; pointer-events: none; }
+    .shell > * { pointer-events: auto; }
     .topbar { display: flex; justify-content: space-between; align-items: center; }
-    .brand { font-size: 15px; font-weight: 600; letter-spacing: 0.32em; color: var(--muted); }
-    .pills { display: flex; gap: 8px; }
-    .pill {
-      display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 999px;
-      background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(20px) saturate(160%);
-      -webkit-backdrop-filter: blur(20px) saturate(160%); font-size: 13px; font-weight: 600; color: var(--muted);
-      transition: opacity 0.4s var(--ease), transform 0.4s var(--spring);
-    }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); transition: background 0.3s; }
-    .pill.live .dot { background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.8); animation: blink 1.8s ease-in-out infinite; }
+    .brand { font-size: 13px; font-weight: 600; letter-spacing: 0.34em; color: var(--muted); }
+    .pills { display: flex; gap: 8px; align-items: center; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 13px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--muted);
+      background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); }
+    .pill.live .dot { background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.9); }
     .pill.connecting .dot { background: #ffcc4d; }
     .pill.offline-mode { color: #ffcc4d; }
-    @keyframes blink { 50% { opacity: 0.35; } }
 
-    .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-    .stage > :first-child { margin-top: auto; }
-    .stage > :last-child { margin-bottom: auto; }
+    /* The particles own the upper part of the screen; words and controls sit below. */
+    .space { flex: 1; min-height: 0; }
+    .home, .talk { display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+    .line { font-size: clamp(28px, 3.8vw, 50px); font-weight: 300; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; max-width: 1000px; }
+    /* A dark halo keeps the words readable when particles pass behind them. */
+    .line, .sub { text-shadow: 0 0 22px var(--bg), 0 0 8px var(--bg), 0 0 3px var(--bg); }
+    .line.fresh { animation: rise-in 0.6s var(--spring) both; }
+    .sub { font-size: clamp(15px, 1.5vw, 19px); font-weight: 400; color: var(--muted); }
+    /* Messages: one glass pill under the top bar that puts itself away. */
+    .toast { position: fixed; left: 50%; top: 74px; z-index: 30; transform: translateX(-50%); display: none; align-items: center; gap: 10px; max-width: min(640px, 88vw);
+      padding: 12px 20px 12px 16px; border-radius: 999px; font-size: 15px; color: var(--text); background: rgba(16, 16, 24, 0.6); border: 1px solid var(--glass-edge);
+      backdrop-filter: blur(26px) saturate(150%); -webkit-backdrop-filter: blur(26px) saturate(150%); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45); }
+    .toast.show { display: inline-flex; animation: toast-in 0.5s var(--spring) both; }
+    .toast.warn { border-color: rgba(255, 204, 77, 0.55); }
+    .toast svg { flex: none; width: 20px; height: 20px; color: #ffcc4d; }
+    @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -14px); filter: blur(6px); } }
 
-    .caption { max-width: 1100px; text-align: center; font-weight: 600; line-height: 1.22;
-      font-size: clamp(26px, 3.6vw, 44px); letter-spacing: -0.02em; text-wrap: balance;
-      transition: font-size 0.45s var(--spring); }
-    .caption.fresh { animation: rise-in 0.55s var(--spring); }
-    body.rich .caption { font-size: clamp(20px, 2.4vw, 30px); }
-    .you { min-height: 34px; display: flex; align-items: center; }
-    .you span { display: inline-block; padding: 7px 16px; border-radius: 999px; font-size: 16px; color: var(--muted);
-      background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glass-edge); animation: rise-in 0.4s var(--spring); }
+    /* Staff PIN pad and the logo hold countdown (kiosk.js draws them; this is their new look). */
+    body .k-pad { background: linear-gradient(to bottom, rgba(5, 5, 10, 0.78), rgba(5, 5, 10, 0.5)); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); gap: 20px; animation: g-fade 0.3s var(--ease) both; }
+    body .k-pad h2 { font-size: 30px; font-weight: 300; letter-spacing: -0.02em; }
+    body .k-pad p { font-size: 15px; }
+    body .k-dots i { width: 11px; height: 11px; border-width: 1px; border-color: var(--glass-edge); background: var(--glass); }
+    body .k-dots i.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.9); }
+    body .k-keys { grid-template-columns: repeat(3, 82px); gap: 14px; perspective: 900px; }
+    body .k-keys button { height: 82px; font-size: 27px; font-weight: 300; background: rgba(16, 16, 24, 0.5); border: 1px solid var(--glass-edge);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1); transition: transform 0.2s var(--spring), background 0.2s, border-color 0.2s; }
+    body .k-keys button:active { transform: scale(0.93); background: rgba(255, 255, 255, 0.14); border-color: rgba(var(--accent-rgb), 0.7); }
+    body .k-keys button.small { font-size: 14px; font-weight: 400; }
+    body .k-hold { top: 62px; left: 40px; background: rgba(16, 16, 24, 0.6); font-weight: 400; }
+    body .k-hold b { font-weight: 300; font-size: 20px; }
+    @keyframes g-fade { from { opacity: 0; } }
 
-    /* Card: frosted glass that springs in; contents arrive in a short stagger. */
-    .card { width: min(980px, 100%); padding: 22px 26px; border-radius: 28px; display: none;
-      background: var(--glass); border: 1px solid var(--glass-edge);
-      backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
-      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06); transform-origin: 50% 70%; }
-    .card.show { display: block; }
-    .card.enter { animation: card-in 0.62s var(--spring) both; }
-    .card.leave { animation: card-out 0.24s var(--ease) both; }
-    .card.enter .reveal { animation: rise-in 0.6s var(--spring) both; }
-    .card.enter .reveal:nth-child(2) { animation-delay: 0.06s; }
-    .card.enter .r2 { animation-delay: 0.12s; }
-    .card.enter .r3 { animation-delay: 0.2s; }
-    .card-main { display: flex; gap: 24px; align-items: center; }
-    .card-text { flex: 1; min-width: 0; }
-    .card h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-    .card p { font-size: 20px; line-height: 1.45; color: var(--text); }
-    .qr { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    .qr img { width: 132px; height: 132px; border-radius: 18px; padding: 8px; background: #fff;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
-    .card.enter .qr img { animation: pop 0.7s var(--spring) 0.22s both; }
-    .qr span { font-size: 12px; font-weight: 600; color: var(--muted); }
-    .media { margin-top: 18px; border-radius: 20px; overflow: hidden; height: 26vh; position: relative; background: rgba(255,255,255,0.04); }
-    .card.enter .media { animation: unveil 0.8s var(--ease) 0.16s both; }
-    .media img { width: 100%; height: 100%; display: block; }
-    .media.photo img { object-fit: cover; animation: kenburns 16s ease-in-out infinite alternate; }
+    .glass { appearance: none; font: inherit; color: var(--text); cursor: pointer; background: var(--glass); border: 1px solid var(--glass-edge);
+      backdrop-filter: blur(24px) saturate(140%); -webkit-backdrop-filter: blur(24px) saturate(140%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); transition: transform 0.25s var(--spring), background 0.25s, border-color 0.25s; }
+    .glass:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.12); }
+    .talk-btn { display: inline-flex; align-items: center; gap: 12px; height: 68px; padding: 0 38px; border-radius: 999px; font-size: 21px; font-weight: 500;
+      border-color: rgba(var(--accent-rgb), 0.55); box-shadow: 0 0 44px rgba(var(--accent-rgb), 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      animation: invite 3.4s var(--ease) infinite; }
+    @keyframes invite { 50% { box-shadow: 0 0 64px rgba(var(--accent-rgb), 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.12); } }
+    .talk-btn svg { width: 22px; height: 22px; }
+    .chips { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 22px; border-radius: 999px; font-size: 16px; font-weight: 400; color: var(--text); }
+    .chip svg { width: 19px; height: 19px; opacity: 0.75; }
+    .home > *, .talk > * { animation: rise-in 0.7s var(--spring) both; }
+    .home > :nth-child(2) { animation-delay: 0.06s; } .home > :nth-child(3) { animation-delay: 0.12s; } .home > :nth-child(4) { animation-delay: 0.18s; }
+    .end { height: 42px; padding: 0 22px; border-radius: 999px; font-size: 14px; color: var(--muted); }
+    .home:not(.hidden) ~ .bottom #btnGames { display: none; }  /* the home screen has its own Games shortcut */
+    .bottom { display: flex; justify-content: center; gap: 12px; min-height: 42px; margin-top: 20px; }
+
+    /* Conversation: Cynobot's sentence, and what it heard in a small glass pill. */
+    .talk .line { transition: font-size 0.45s var(--spring), opacity 0.4s; }
+    .talk .line.long { font-size: clamp(22px, 2.7vw, 36px); }
+    body.rich .talk .line { font-size: clamp(20px, 2.3vw, 30px); }
+    body.rich .talk .line.long { font-size: clamp(17px, 1.9vw, 24px); }
+    body.thinking .talk .line { opacity: 0.4; }
+    .you { min-height: 38px; display: flex; align-items: center; justify-content: center; }
+    .you span { display: inline-block; max-width: min(760px, 86vw); padding: 8px 18px; border-radius: 999px; font-size: 15px; color: var(--muted);
+      background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: rise-in 0.45s var(--spring) both; }
+    /* A tapped card on the home screen takes the greeting's place; the buttons stay. */
+    body.tapped .home .line, body.tapped .home .sub { display: none; }
+    body.tapped .card-main { padding-right: 34px; }  /* room for the close button */
+
+    /* Info card: glass floating in the scene between the top bar and the words, leaning a
+       few degrees. Its parts sit at different depths, so a finger moving nearby shifts them. */
+    .card-wrap { position: fixed; left: 0; right: 0; top: var(--card-top, 90px); bottom: var(--card-bottom, 250px); z-index: 2; display: none;
+      align-items: center; justify-content: center; padding: 0 40px; perspective: 1400px; pointer-events: none; }
+    .card-wrap.show { display: flex; }
+    .card { position: relative; pointer-events: auto; width: min(900px, 100%); max-height: 100%; display: flex; flex-direction: column; padding: 24px 28px; border-radius: 30px;
+      background: rgba(16, 16, 24, 0.52); border: 1px solid var(--glass-edge);
+      backdrop-filter: blur(34px) saturate(160%); -webkit-backdrop-filter: blur(34px) saturate(160%);
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transform: rotateX(var(--rx, 3deg)) rotateY(var(--ry, -5deg)); transition: transform 0.5s var(--ease); transform-style: preserve-3d; }
+    /* Sheen: a soft highlight that slides across the glass as the card leans. */
+    .card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      background: radial-gradient(60% 80% at var(--gx, 30%) var(--gy, 0%), rgba(255, 255, 255, 0.11), transparent 60%); }
+    .card-wrap.enter .card { animation: card-in 0.7s var(--spring) both; }
+    .card-wrap.leave .card { animation: card-out 0.26s var(--ease) both; }
+    .card-wrap.enter .card-text > *, .card-wrap.enter .qr, .card-wrap.enter .media { animation: rise-in 0.6s var(--spring) both; }
+    .card-wrap.enter .card-text p { animation-delay: 0.07s; }
+    .card-wrap.enter .qr { animation-delay: 0.16s; }
+    .card-wrap.enter .media { animation-delay: 0.22s; }
+    .card-main { display: flex; gap: 24px; align-items: center; transform: translateZ(22px); }
+    .card-text { flex: 1; min-width: 0; text-align: left; }
+    .card h2 { font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .card p { font-size: clamp(16px, 1.7vw, 20px); font-weight: 300; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+    .qr { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; transform: translateZ(26px); }
+    .qr img { width: clamp(96px, 13vh, 132px); height: clamp(96px, 13vh, 132px); border-radius: 18px; padding: 8px; background: #fff; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4); }
+    .qr span { font-size: 12px; color: var(--muted); }
+    .media { flex: 1 1 26vh; min-height: 90px; max-height: 34vh; margin-top: 18px; border-radius: 20px; overflow: hidden; background: rgba(255, 255, 255, 0.04); transform: translateZ(10px); }
+    .media img { width: 100%; height: 100%; display: block; object-fit: cover; }
     .media.whole img { object-fit: contain; padding: 12px; }
-    .hidden { display: none !important; }
+    .card-close { position: absolute; top: 14px; right: 14px; z-index: 1; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; line-height: 1; color: var(--muted); transform: translateZ(30px); }
 
-    @keyframes card-in { from { opacity: 0; transform: translateY(28px) scale(0.94); filter: blur(14px); } }
-    @keyframes card-out { to { opacity: 0; transform: translateY(-10px) scale(0.97); filter: blur(10px); } }
     @keyframes rise-in { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } }
     @keyframes pop { from { opacity: 0; transform: scale(0.6); } }
-    @keyframes unveil { from { clip-path: inset(0 0 100% 0 round 20px); opacity: 0.4; } to { clip-path: inset(0 0 0 0 round 20px); } }
-    @keyframes kenburns { from { transform: scale(1.02); } to { transform: scale(1.1) translate(-1.5%, -1%); } }
-
-    .start { appearance: none; cursor: pointer; font: inherit; font-size: 24px; font-weight: 600; color: #fff;
-      padding: 24px 58px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16);
-      background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.95), rgba(var(--accent-rgb), 0.7));
-      box-shadow: 0 18px 50px rgba(var(--accent-rgb), 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-      animation: invite 3.2s var(--ease) infinite; transition: transform 0.25s var(--spring); }
-    .start:active { transform: scale(0.96); }
-    @keyframes invite { 50% { box-shadow: 0 18px 70px rgba(var(--accent-rgb), 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.35); } }
-    .bottom { display: flex; justify-content: center; gap: 12px; min-height: 40px; }
-    .end { appearance: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
-      height: 40px; padding: 0 22px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge);
-      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-    .error { color: #ffb4b4; text-align: center; font-size: 15px; min-height: 1.2em; }
-
+    @keyframes card-in { from { opacity: 0; transform: translateY(40px) rotateX(18deg) rotateY(-16deg) scale(0.92); filter: blur(12px); } }
+    @keyframes card-out { to { opacity: 0; transform: translateY(-12px) scale(0.97); filter: blur(10px); } }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
   </style>
-  <link rel="stylesheet" href="games.css?v=1" />
+  <link rel="stylesheet" href="games2.css?v=2" />
 </head>
 <body>
-  <div class="ambient"></div>
+  <canvas id="stage"></canvas>
   <div class="shell">
     <header class="topbar">
       <span class="brand">CYNOBOT</span>
       <span class="pills">
         <span class="pill hidden" id="mode"></span>
-        <span class="pill" id="status"><span class="dot"></span><span id="statusLabel">Offline</span></span>
+        <span class="pill" id="status"><span class="dot"></span><span id="statusLabel">Ready</span></span>
       </span>
     </header>
+    <div class="space"></div>
 
-    <main class="stage">
-      <div class="caption" id="caption">Tap the screen to talk to Cynobot.</div>
+    <!-- Home: nobody is talking yet -->
+    <section class="home" id="home">
+      <div class="line">Hi, I'm Cynobot.</div>
+      <div class="sub">Tap to talk, or pick a topic.</div>
+      <button class="glass talk-btn" id="btnStart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        Tap to talk
+      </button>
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <!-- Conversation: Cynobot's words, and what it heard -->
+    <section class="talk hidden" id="talk">
+      <div class="line" id="caption"></div>
       <div class="you" id="you"></div>
-      <div class="card" id="card">
-        <div class="card-main">
-          <div class="card-text"><h2 class="reveal" id="cardTitle"></h2><p class="reveal" id="cardBody"></p></div>
-          <div class="qr hidden" id="cardQr"><img id="cardQrImg" alt="QR code" /><span class="reveal r3" id="cardQrLabel">Scan with your phone</span></div>
-        </div>
-        <div class="media hidden" id="cardMedia"><img id="cardImg" alt="" /></div>
-      </div>
-      <button class="start" id="btnStart">Tap to talk</button>
-      <div class="error" id="error"></div>
-    </main>
+    </section>
 
     <footer class="bottom">
-      <button class="end hidden" id="btnGames">Games</button>
-      <button class="end hidden" id="btnEnd">End conversation</button>
+      <button class="glass end hidden" id="btnGames">Games</button>
+      <button class="glass end hidden" id="btnEnd">End conversation</button>
     </footer>
   </div>
+
+  <div class="card-wrap" id="cardWrap">
+    <div class="card" id="card">
+      <button class="glass card-close hidden" id="cardClose" aria-label="Close">×</button>
+      <div class="card-main">
+        <div class="card-text"><h2 id="cardTitle"></h2><p id="cardBody"></p></div>
+        <div class="qr hidden" id="cardQr"><img id="cardQrImg" alt="QR code" /><span id="cardQrLabel">Scan with your phone</span></div>
+      </div>
+      <div class="media hidden" id="cardMedia"><img id="cardImg" alt="" /></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5 M12 16.5h.01 M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0"/></svg><span id="toastText"></span></div>
   <audio id="botAudio" autoplay></audio>
   <div class="games hidden" id="games"></div>
 
+  <script src="particles.js?v=10"></script>
   <script src="devices.js?v=1"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    let pc = null;
-    let micStream = null;
+    // The particle scene. Without 3D (no WebGL, or the graphics driver gave up) the page
+    // uses its plain background and everything else works the same.
+    let stage = null;
+    const goPlain = () => document.body.classList.add('plain');
+    try { stage = window.CynoParticles ? CynoParticles.create($('stage'), { onLost: goPlain }) : null; } catch (e) { stage = null; }
+    if (!stage) goPlain();
+
+    // How much 3D to draw: set in Cyno Control (Controls > Displays > Chest background).
+    let sceneSetting = '';
+    function applySceneSetting(value) {
+      if (!stage || !value || value === sceneSetting) return;
+      sceneSetting = value;
+      document.body.classList.toggle('plain', value === 'off');
+      stage.pause(value === 'off');
+      if (value === 'full') stage.setQuality(3);
+      else if (value === 'light') stage.setQuality(0);
+      else if (value === 'auto') stage.setAuto(2);
+    }
+    // Tell Cyno Control how fast this screen is really drawing, so the team can judge the setting.
+    setInterval(() => {
+      if (document.hidden) return;
+      const st = stage ? stage.stats() : {};
+      const body = sceneSetting === 'off' || !stage ? { scene: stage ? 'off' : 'none' } : { scene: sceneSetting || 'auto', fps: st.fps, particles: st.particles, quality: st.quality, renderer: st.renderer };
+      fetch('/api/chest-stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+    }, 5000);
+    let pc = null, micStream = null;
     // True from "Tap to talk" until "End conversation": if the link drops in between
     // (e.g. Wi-Fi died), reconnect; the server then falls back to offline mode.
-    let wantVoice = false;
-    let sawLive = false;
+    let wantVoice = false, sawLive = false;
+    let state = {};
 
-    // ---- Card: swap with a cross-fade only when the fact actually changes ----
+    // ---- Messages in plain words (never a raw error) ----
+    let toastTimer = null;
+    function toast(text, ms = 6000) {
+      clearTimeout(toastTimer);
+      const t = $('toast');
+      if (!text) return t.classList.remove('show');
+      $('toastText').textContent = text;
+      t.classList.remove('show'); void t.offsetWidth; t.classList.add('show', 'warn');
+      if (ms) toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+    }
+    function explain(err) {
+      const name = (err && err.name) || '', msg = String((err && err.message) || err || '');
+      if (name === 'NotAllowedError' || name === 'SecurityError') return "I can't use the microphone. Please ask a staff member.";
+      if (name === 'NotFoundError' || name === 'OverconstrainedError') return "I can't find a microphone. Please ask a staff member.";
+      if (name === 'NotReadableError') return 'The microphone is busy in another app. Please ask a staff member.';
+      if (name === 'TypeError' || /fetch|network|Server error/i.test(msg)) return "I can't reach my brain right now. Please try again in a moment.";
+      return 'Something went wrong. Please try again.';
+    }
+
+    // ---- Tap shortcuts: a fact's card with no conversation needed (works offline) ----
+    const ICON = {
+      pin: '<path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/>',
+      cap: '<path d="M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5z"/><path d="M6.5 11.7V16c1.6 1.3 3.4 2 5.5 2s3.9-.7 5.5-2v-4.3"/>',
+      mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m4 7.5 8 6 8-6"/>',
+      play: '<rect x="3" y="7" width="18" height="11" rx="5.5"/><path d="M8 11v3M6.5 12.5h3M15.5 11.7h.01M17.5 13.3h.01"/>',
+    };
+    const SHORTCUTS = [
+      { label: 'Find us', icon: 'pin', fact: 'campuses' },
+      { label: 'Courses', icon: 'cap', fact: 'undergraduate' },
+      { label: 'Apply', icon: 'mail', fact: 'admission_process' },
+      { label: 'Games', icon: 'play', games: true },
+    ];
+    const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON[name]}</svg>`;
+    $('chips').innerHTML = SHORTCUTS.map((s, i) => `<button class="glass chip" data-i="${i}">${svg(s.icon)}${s.label}</button>`).join('');
+    $('chips').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', async () => {
+      const s = SHORTCUTS[Number(b.dataset.i)];
+      if (s.games) return $('btnGames').click();
+      try {
+        const r = await fetch('/api/card/' + encodeURIComponent(s.fact));
+        if (r.ok) showCard(await r.json(), true);
+      } catch (e) {}
+    }));
+
+    // The Games shortcut follows the Games switch in Cyno Control.
+    const gamesChip = [...$('chips').children].find((c) => SHORTCUTS[Number(c.dataset.i)].games);
+    const syncGamesChip = () => gamesChip.classList.toggle('hidden', $('btnGames').classList.contains('hidden'));
+    new MutationObserver(syncGamesChip).observe($('btnGames'), { attributes: true, attributeFilter: ['class'] });
+    syncGamesChip();
+
+    // ---- Card: floats in the scene; swaps only when the fact actually changes ----
     const cardKey = (c) => (c ? [c.title, c.image || '', c.link || ''].join('|') : '');
-    let shownKey = '';
-    let swap = 0;
-
+    let shownKey = '', swap = 0, tapped = false, tapTimer = null, topicUntil = 0;
+    const TOPIC_MS = 1700;
+    const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function loadImage(img, src) {
       return new Promise((resolve) => {
         if (!src) return resolve();
@@ -181,24 +297,36 @@
         setTimeout(done, 800);  // never hold the card back for a slow picture
       });
     }
-
-    async function showCard(card) {
+    async function showCard(card, fromTap = false) {
       const key = cardKey(card);
       if (key === shownKey) return;
       shownKey = key;
-      const my = ++swap;
-      const el = $('card');
-      if (el.classList.contains('show')) {
-        el.classList.remove('enter'); void el.offsetWidth; el.classList.add('leave');
-        await new Promise((r) => setTimeout(r, 230));
+      const my = ++swap, wrap = $('cardWrap');
+      clearTimeout(tapTimer);
+      if (wrap.classList.contains('show')) {
+        wrap.classList.remove('enter'); void wrap.offsetWidth; wrap.classList.add('leave');
+        await new Promise((r) => setTimeout(r, 240));
         if (my !== swap) return;
       }
-      el.classList.remove('leave', 'enter', 'show');
-      document.body.classList.toggle('rich', Boolean(card && card.image));
+      wrap.classList.remove('leave', 'enter', 'show');
+      tapped = Boolean(card && fromTap);
+      document.body.classList.toggle('tapped', tapped);
+      document.body.classList.toggle('rich', Boolean(card));  // smaller words while a card is up
+      syncScene();
+      placeCard();
       if (!card) return;
-
+      // Topic moment: the particles first trace the topic's drawing (a pin for a place, a cap
+      // for degrees...), then melt into the wave as the card arrives.
+      if (card.icon && stage && !reducedMotion) {
+        topicUntil = Date.now() + TOPIC_MS;
+        stage.setTopic(card.icon);
+        await new Promise((r) => setTimeout(r, TOPIC_MS));
+        if (my !== swap) return;
+        syncScene();
+      }
       $('cardTitle').textContent = card.title;
       $('cardBody').textContent = card.body;
+      $('cardClose').classList.toggle('hidden', !fromTap);
       $('cardQr').classList.toggle('hidden', !card.link);
       $('cardQrLabel').textContent = (card.link || '').startsWith('mailto:') ? 'Scan to email us' : 'Scan with your phone';
       $('cardMedia').classList.toggle('hidden', !card.image);
@@ -208,64 +336,137 @@
       ]);
       if (my !== swap) return;
       if (card.image) {
-        // Photos fill the frame and drift; logos and very wide or tall pictures are shown whole.
         const ratio = $('cardImg').naturalWidth / ($('cardImg').naturalHeight || 1);
-        const photo = ratio > 1.2 && ratio < 2.6;
-        $('cardMedia').classList.toggle('photo', photo);
-        $('cardMedia').classList.toggle('whole', !photo);
+        $('cardMedia').classList.toggle('whole', !(ratio > 1.2 && ratio < 2.6));  // logos are shown whole
       }
-      void el.offsetWidth;
-      el.classList.add('show', 'enter');
+      void wrap.offsetWidth;
+      wrap.classList.add('show', 'enter');
+      if (fromTap) tapTimer = setTimeout(() => showCard(null), 25000);  // a tapped card puts itself away
     }
+    $('cardClose').addEventListener('click', () => showCard(null));
+    // The card leans a little toward the visitor's finger.
+    window.addEventListener('pointermove', (e) => {
+      const x = e.clientX / window.innerWidth - 0.5, y = e.clientY / window.innerHeight - 0.5;
+      const c = $('card').style;
+      c.setProperty('--ry', `${-5 + x * 8}deg`); c.setProperty('--rx', `${3 - y * 6}deg`);
+      c.setProperty('--gx', `${30 + x * 60}%`); c.setProperty('--gy', `${y * 60}%`);
+      $('games').style.setProperty('--gx', x.toFixed(3)); $('games').style.setProperty('--gy', y.toFixed(3));  // game tiles lean too
+    });
+
+    // ---- What the particles show ----
+    function syncScene() {
+      if (!stage) return;
+      const live = (state.voice_status || 'OFFLINE') === 'LIVE';
+      const gamesOpen = !$('games').classList.contains('hidden');
+      if (!gamesOpen && Date.now() < topicUntil) return;  // a topic drawing is on screen
+      const scene = gamesOpen ? 'games'
+        : live && state.expression === 'THINKING' ? 'think'
+        : live && state.expression === 'SPEAKING' ? 'answer'
+        : live ? 'listen'
+        : wantVoice ? 'think'  // connecting
+        : tapped ? 'answer' : 'idle';
+      stage.setState(scene);
+      stage.setTheme(state.theme === 'BLUE' ? 'BLUE' : 'RED');
+    }
+    // The empty space between the top bar and the words: the ribbon, ring and swirl live
+    // there, and so does a card when one is showing.
+    function freeArea() {
+      const top = document.querySelector('.topbar').getBoundingClientRect().bottom;
+      const block = $('home').classList.contains('hidden') ? $('talk') : $('home');
+      const bottom = block.getBoundingClientRect().top || window.innerHeight * 0.6;
+      return { top, bottom: Math.max(top + 80, bottom) };
+    }
+    function frameStage() {
+      if (!stage) return;
+      const { top, bottom } = freeArea(), free = bottom - top - 24;
+      stage.setFrame((top + 12 + free / 2) / window.innerHeight, free / window.innerHeight);
+    }
+    function placeCard() {
+      requestAnimationFrame(() => {
+        const { top, bottom } = freeArea(), wrap = $('cardWrap').style;
+        wrap.setProperty('--card-top', `${top + 18}px`);
+        wrap.setProperty('--card-bottom', `${window.innerHeight - bottom + 22}px`);
+        frameStage();
+      });
+    }
+    window.addEventListener('resize', placeCard);
+    new MutationObserver(() => {
+      document.body.classList.toggle('games-open', !$('games').classList.contains('hidden'));
+      syncScene();
+    }).observe($('games'), { attributes: true, attributeFilter: ['class'] });
+
+    // ---- Voice loudness drives the ring and the wave ----
+    let audioCtx = null, micMeter = null, botMeter = null;
+    function meter(stream) {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const an = audioCtx.createAnalyser(); an.fftSize = 512;
+        audioCtx.createMediaStreamSource(stream).connect(an);
+        const buf = new Uint8Array(an.fftSize);
+        return () => { an.getByteTimeDomainData(buf); let s = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / buf.length) * 4.5); };
+      } catch (e) { return null; }
+    }
+    setInterval(() => {
+      if (!stage) return;
+      const speaking = state.expression === 'SPEAKING';
+      const read = speaking ? botMeter : micMeter;
+      stage.setLevel(pc && read ? read() : 0);
+    }, 50);
 
     // ---- State bus (shared with the face display) ----
-    let lastCaption = '';
-    function render(state) {
-      document.body.classList.toggle('theme-blue', state.theme === 'BLUE');
-      document.body.classList.toggle('thinking', state.expression === 'THINKING');
-      document.body.classList.toggle('speaking', state.expression === 'SPEAKING');
-
-      const text = state.last_spoken_text || '';
-      if (text && text !== lastCaption) {
-        const cap = $('caption');
-        // A new sentence (not the same one growing word by word) gets a soft entrance.
-        if (!text.startsWith(lastCaption.slice(0, 12))) { cap.classList.remove('fresh'); void cap.offsetWidth; cap.classList.add('fresh'); }
-        cap.textContent = text; lastCaption = text;
-      }
-      const you = state.user_text ? `“${state.user_text}”` : '';
-      if (you !== ($('you').textContent || '')) $('you').innerHTML = you ? '<span></span>' : '';
-      if (you) $('you').firstChild.textContent = you;
-      showCard(state.card || null);
-
-      const st = state.voice_status || 'OFFLINE';
-      // The server ended our live session (e.g. Gemini dropped): reconnect now rather
-      // than waiting several seconds for WebRTC to notice the hang-up.
+    let lastCaption = '', lastHeard = '';
+    function render(s) {
+      const wonBefore = state.expression, modeBefore = state.voice_mode;
+      state = s;
+      document.body.classList.toggle('theme-blue', s.theme === 'BLUE');
+      applySceneSetting(s.chest_scene);
+      const st = s.voice_status || 'OFFLINE';
       if (st === 'LIVE') sawLive = true;
-      // Cynobot hung up because the visitor walked away: back to "Tap to talk", no reconnect.
-      if (st === 'OFFLINE' && state.session_end === 'idle') wantVoice = false;
+      if (st === 'OFFLINE' && s.session_end === 'idle') wantVoice = false;
+      if (s.voice_mode === 'OFFLINE' && modeBefore !== 'OFFLINE' && st === 'LIVE') toast("I'm offline, so my answers may be a little slower.", 5000);  // Cynobot hung up: visitor walked away
       if (st === 'OFFLINE' && sawLive && pc) { sawLive = false; dropped(pc); }
-      $('status').className = 'pill ' + st.toLowerCase();
-      $('statusLabel').textContent = st === 'LIVE' ? 'Listening' : st === 'CONNECTING' ? 'Connecting…' : 'Offline';
       const live = st !== 'OFFLINE';
-      $('btnStart').classList.toggle('hidden', live || wantVoice);
-      $('btnEnd').classList.toggle('hidden', !live);
-      $('mode').classList.toggle('hidden', !live || !state.voice_mode);
-      $('mode').classList.toggle('offline-mode', state.voice_mode === 'OFFLINE');
-      $('mode').textContent = state.voice_mode === 'OFFLINE' ? 'Offline mode' : 'Online';
-      // Add-ons (device choice, games) follow the same state; a fault there must not stop the display.
-      try { if (window.CynoDevices) CynoDevices.onState(state); } catch (e) {}
-      try { if (window.CynoGames) CynoGames.onState(state); } catch (e) {}
-    }
 
+      $('status').className = 'pill ' + st.toLowerCase();
+      $('statusLabel').textContent = st === 'CONNECTING' ? 'Connecting…' : st !== 'LIVE' ? 'Ready'
+        : s.expression === 'SPEAKING' ? 'Speaking' : s.expression === 'THINKING' ? 'Thinking' : 'Listening';
+      $('mode').classList.toggle('hidden', !live || s.voice_mode !== 'OFFLINE');
+      $('mode').classList.add('offline-mode'); $('mode').textContent = 'Offline mode';
+      $('home').classList.toggle('hidden', live || wantVoice);
+      $('talk').classList.toggle('hidden', !(live || wantVoice));
+      $('btnEnd').classList.toggle('hidden', !live);
+
+      const text = live ? (s.last_spoken_text || '') : '';
+      if (text !== lastCaption) {
+        const cap = $('caption');
+        if (!text.startsWith(lastCaption.slice(0, 12))) { cap.classList.remove('fresh'); void cap.offsetWidth; cap.classList.add('fresh'); }
+        cap.textContent = text || (st === 'CONNECTING' ? 'One moment…' : ''); lastCaption = text;
+        cap.classList.toggle('long', text.length > 110);
+        placeCard();  // the words grew or shrank: the card and the particles re-fit
+      }
+      document.body.classList.toggle('thinking', live && s.expression === 'THINKING');
+      const heard = s.user_text ? `“${s.user_text}”` : '';
+      if (heard !== lastHeard) {
+        lastHeard = heard;
+        $('you').innerHTML = heard ? '<span></span>' : '';
+        if (heard) $('you').firstChild.textContent = heard;
+      }
+      if (s.card || !tapped) showCard(s.card || null);  // a conversation card replaces a tapped one
+      if (s.expression === 'HAPPY' && wonBefore !== 'HAPPY' && stage) stage.burst();  // game win, greeting
+      syncScene();
+      placeCard();
+      try { if (window.CynoDevices) CynoDevices.onState(s); } catch (e) {}
+      try { if (window.CynoGames) CynoGames.onState(s); } catch (e) {}
+    }
     function connectBus() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const ws = new WebSocket(`${proto}://${location.host}/ws`);
-      ws.onmessage = (ev) => {
-        try { const msg = JSON.parse(ev.data); if (msg.state) render(msg.state); } catch (e) {}
-      };
+      ws.onmessage = (ev) => { try { const msg = JSON.parse(ev.data); if (msg.state) render(msg.state); } catch (e) {} };
       ws.onclose = () => setTimeout(connectBus, 2000);
     }
     connectBus();
+    frameStage();
 
     // ---- Voice link (WebRTC to the Pipecat pipeline) ----
     function waitForIce(peer, timeoutMs = 2500) {
@@ -277,69 +478,67 @@
         setTimeout(done, timeoutMs);
       });
     }
-
     async function startVoice() {
-      $('error').textContent = '';
+      toast('');
+      showCard(null);
       try {
         // Browser echo cancellation keeps Cynobot from hearing its own voice.
         const mic = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
         try {
           micStream = await navigator.mediaDevices.getUserMedia({ audio: window.CynoDevices ? CynoDevices.audio(mic) : mic });
         } catch (e) {
-          // The chosen microphone was unplugged: use the default one rather than failing.
-          micStream = await navigator.mediaDevices.getUserMedia({ audio: mic });
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: mic });  // chosen mic unplugged: use the default
         }
-        if (window.CynoDevices) CynoDevices.refresh();  // device names are visible once the mic is allowed
+        if (window.CynoDevices) CynoDevices.refresh();
+        micMeter = meter(micStream);
         pc = new RTCPeerConnection();
         // Pipecat expects transceiver 0 = audio, 1 = video (video stays unused).
         pc.addTransceiver(micStream.getAudioTracks()[0], { direction: 'sendrecv' });
         pc.addTransceiver('video', { direction: 'sendrecv' });
         pc.createDataChannel('chat');
         pc.ontrack = (ev) => {
-          if (ev.track.kind === 'audio') $('botAudio').srcObject = ev.streams[0] || new MediaStream([ev.track]);
+          if (ev.track.kind !== 'audio') return;
+          const stream = ev.streams[0] || new MediaStream([ev.track]);
+          $('botAudio').srcObject = stream;
+          botMeter = meter(stream);
         };
         const thisPc = pc;
-        pc.onconnectionstatechange = () => {
-          if (['failed', 'closed', 'disconnected'].includes(thisPc.connectionState)) dropped(thisPc);
-        };
-        pc.oniceconnectionstatechange = () => {
-          if (['failed', 'closed', 'disconnected'].includes(thisPc.iceConnectionState)) dropped(thisPc);
-        };
-
+        pc.onconnectionstatechange = () => { if (['failed', 'closed', 'disconnected'].includes(thisPc.connectionState)) dropped(thisPc); };
+        pc.oniceconnectionstatechange = () => { if (['failed', 'closed', 'disconnected'].includes(thisPc.iceConnectionState)) dropped(thisPc); };
         await pc.setLocalDescription(await pc.createOffer());
         await waitForIce(pc);
         const res = await fetch('/api/offer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type }),
         });
         const answer = await res.json();
         if (!res.ok || answer.error) throw new Error(answer.error || `Server error ${res.status}`);
         await pc.setRemoteDescription(answer);
       } catch (err) {
-        $('error').textContent = err.message || String(err);
+        console.warn('Voice link failed:', err);
+        toast(explain(err));
         wantVoice = false;
         closeLink();
+        render(state);
       }
     }
-
     function closeLink() {
       if (pc) { try { pc.close(); } catch (e) {} pc = null; }
       if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+      micMeter = botMeter = null;
     }
-
     function dropped(which) {
       if (which !== pc) return;  // an old link we already replaced
       closeLink();
+      if (wantVoice) toast('Reconnecting…', 4000);
       if (wantVoice) setTimeout(() => { if (wantVoice && !pc) startVoice(); }, 500);
     }
-
-    $('btnStart').addEventListener('click', () => { wantVoice = true; startVoice(); });
-    $('btnEnd').addEventListener('click', () => { wantVoice = false; closeLink(); });
+    $('btnStart').addEventListener('click', () => { wantVoice = true; render(state); startVoice(); });
+    $('btnEnd').addEventListener('click', () => { wantVoice = false; closeLink(); render(state); });
     // For the games add-on: start a conversation (Word Chain is played by voice).
-    window.CynoChest = { startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; startVoice(); } } };
+    window.CynoChest = { startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; render(state); startVoice(); } } };
   </script>
-  <script src="games.js?v=1"></script>
+  <script src="games.js?v=2"></script>
   <script src="kiosk.js?v=2"></script>
 </body>
 </html>

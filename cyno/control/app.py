@@ -324,6 +324,28 @@ class Api:
             return {"ok": False, "error": "Start Cyno and open the chest screen first."}
         return {"ok": True}
 
+    # ---------- chest background (particle scene) ----------
+
+    def get_chest_scene(self):
+        from cyno import display
+
+        live = self._get(f"{self._base()}/api/chest-stats")
+        if live and "scene" in live:
+            return {"running": True, **live}
+        return {"running": False, "scene": display.load_scene(), "stats": {}}
+
+    def set_chest_scene(self, value: str):
+        from cyno import display
+
+        r = self._notify("/api/chest-scene", {"value": value})
+        if r is not None and r.status_code == 200:
+            return {"ok": True, "live": True}
+        try:
+            display.save_scene(value)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "live": False}
+
     # ---------- locked chest screen ----------
 
     def kiosk_status(self):

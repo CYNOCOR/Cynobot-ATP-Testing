@@ -15,6 +15,19 @@
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const game = (id) => cfg && cfg.games.find((g) => g.id === id);
   const isOpen = () => !root.classList.contains('hidden');
+  // Line icons (24 x 24 grid). The classic backup screen hides them.
+  const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  const GAME_ICON = {
+    riddles: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7 M12 16.5h.01',
+    memory: 'M4 8h9v12H4z M8 8V4.5h9.5v12H13',
+    puzzle: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M14.5 14.5h6v6h-6z',
+    degree: 'M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5z M6.5 11.7V16c1.6 1.3 3.4 2 5.5 2s3.9-.7 5.5-2v-4.3 M21.5 9.5v5',
+    wordchain: 'M4 5h16v11H10l-4 3.5V16H4z M8 9h8 M8 12h5',
+  };
+  // Memory Match faces: the particle scene's topic drawings; emoji on the classic backup screen.
+  const FACES = window.CynoParticles && CynoParticles.iconPaths
+    ? [...new Set([...Object.values(CynoParticles.iconPaths), ...Object.values(GAME_ICON)])].map(svg)  // Set: the cap is in both lists
+    : ['🤖', '💡', '🚀', '🎧', '💻', '📱', '🛰️', '🔋', '🎮', '⚙️', '🔭', '🧲'];
 
   async function loadConfig() {
     try { cfg = await (await fetch('/api/games')).json(); } catch (e) { cfg = null; }
@@ -86,7 +99,7 @@
     const tiles = cfg.games.filter((g) => !g.voice || online);
     body.innerHTML = `<div class="g-menu">${tiles.map((g, i) => `
       <button class="g-tile" data-game="${g.id}" style="animation-delay:${i * 0.05}s">
-        <b>${esc(g.title)}</b><span>${esc(g.about)}</span><em>${g.voice ? 'Play by voice' : 'Tap to play'}</em>
+        ${GAME_ICON[g.id] ? svg(GAME_ICON[g.id]) : ''}<b>${esc(g.title)}</b><span>${esc(g.about)}</span><em>${g.voice ? 'Play by voice' : 'Tap to play'}</em>
       </button>`).join('')}</div>`;
     body.querySelectorAll('[data-game]').forEach((b) => (b.onclick = () => start(b.dataset.game)));
     startClock(false, false);
@@ -174,7 +187,7 @@
 
     // ---------- Memory Match ----------
     memory() {
-      const ICONS = ['🤖', '💡', '🚀', '🎧', '💻', '📱', '🛰️', '🔋', '🎮', '⚙️', '🔭', '🧲'];
+      const ICONS = FACES;
       levelPick('Memory Match', 'Choose your level', [{ id: 'easy', label: 'Easy: 6 pairs' }, { id: 'medium', label: 'Tricky: 8 pairs' }], (level) => {
         const pairs = level === 'easy' ? 6 : 8;
         const deck = shuffle(shuffle(ICONS).slice(0, pairs).flatMap((x) => [x, x]));

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cynobot — Chest Display (classic)</title>
+  <!-- The previous chest design, kept as a backup. The live screen is index.html. -->
+  <style>
+    /* Apple-style: system type in two weights, glass surfaces, one accent (the face colour),
+       spring motion that settles quickly. Cards swap with a blur-and-scale cross-fade and
+       reveal their parts in a short stagger; photos drift slowly while shown. */
+    :root {
+      --accent: #ff3b4e;
+      --accent-rgb: 255, 59, 78;
+      --bg: #0a0405;
+      --glass: rgba(34, 18, 21, 0.55);
+      --glass-edge: rgba(255, 255, 255, 0.09);
+      --text: #f8eef0;
+      --muted: rgba(248, 238, 240, 0.62);
+      --spring: cubic-bezier(0.2, 0.9, 0.25, 1.05);
+      --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+    body.theme-blue {
+      --accent: #2ad8ff;
+      --accent-rgb: 42, 216, 255;
+      --bg: #03080e;
+      --glass: rgba(16, 28, 42, 0.55);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100vw; height: 100vh; overflow: hidden; user-select: none;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+    }
+    /* Soft moving light behind everything, tinted by the face colour. */
+    .ambient { position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(40% 35% at 30% 20%, rgba(var(--accent-rgb), 0.22), transparent 70%),
+        radial-gradient(35% 30% at 75% 80%, rgba(var(--accent-rgb), 0.12), transparent 70%);
+      filter: blur(40px); animation: drift 24s var(--ease) infinite alternate; transition: background 0.6s; }
+    @keyframes drift { to { transform: translate3d(4%, -3%, 0) scale(1.08); } }
+
+    .shell { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; padding: 24px 40px 28px; gap: 16px; }
+
+    .topbar { display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-size: 15px; font-weight: 600; letter-spacing: 0.32em; color: var(--muted); }
+    .pills { display: flex; gap: 8px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 999px;
+      background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%); font-size: 13px; font-weight: 600; color: var(--muted);
+      transition: opacity 0.4s var(--ease), transform 0.4s var(--spring);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); transition: background 0.3s; }
+    .pill.live .dot { background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.8); animation: blink 1.8s ease-in-out infinite; }
+    .pill.connecting .dot { background: #ffcc4d; }
+    .pill.offline-mode { color: #ffcc4d; }
+    @keyframes blink { 50% { opacity: 0.35; } }
+
+    .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .stage > :first-child { margin-top: auto; }
+    .stage > :last-child { margin-bottom: auto; }
+
+    .caption { max-width: 1100px; text-align: center; font-weight: 600; line-height: 1.22;
+      font-size: clamp(26px, 3.6vw, 44px); letter-spacing: -0.02em; text-wrap: balance;
+      transition: font-size 0.45s var(--spring); }
+    .caption.fresh { animation: rise-in 0.55s var(--spring); }
+    body.rich .caption { font-size: clamp(20px, 2.4vw, 30px); }
+    .you { min-height: 34px; display: flex; align-items: center; }
+    .you span { display: inline-block; padding: 7px 16px; border-radius: 999px; font-size: 16px; color: var(--muted);
+      background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glass-edge); animation: rise-in 0.4s var(--spring); }
+
+    /* Card: frosted glass that springs in; contents arrive in a short stagger. */
+    .card { width: min(980px, 100%); padding: 22px 26px; border-radius: 28px; display: none;
+      background: var(--glass); border: 1px solid var(--glass-edge);
+      backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06); transform-origin: 50% 70%; }
+    .card.show { display: block; }
+    .card.enter { animation: card-in 0.62s var(--spring) both; }
+    .card.leave { animation: card-out 0.24s var(--ease) both; }
+    .card.enter .reveal { animation: rise-in 0.6s var(--spring) both; }
+    .card.enter .reveal:nth-child(2) { animation-delay: 0.06s; }
+    .card.enter .r2 { animation-delay: 0.12s; }
+    .card.enter .r3 { animation-delay: 0.2s; }
+    .card-main { display: flex; gap: 24px; align-items: center; }
+    .card-text { flex: 1; min-width: 0; }
+    .card h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .card p { font-size: 20px; line-height: 1.45; color: var(--text); }
+    .qr { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .qr img { width: 132px; height: 132px; border-radius: 18px; padding: 8px; background: #fff;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+    .card.enter .qr img { animation: pop 0.7s var(--spring) 0.22s both; }
+    .qr span { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .media { margin-top: 18px; border-radius: 20px; overflow: hidden; height: 26vh; position: relative; background: rgba(255,255,255,0.04); }
+    .card.enter .media { animation: unveil 0.8s var(--ease) 0.16s both; }
+    .media img { width: 100%; height: 100%; display: block; }
+    .media.photo img { object-fit: cover; animation: kenburns 16s ease-in-out infinite alternate; }
+    .media.whole img { object-fit: contain; padding: 12px; }
+    .hidden { display: none !important; }
+
+    @keyframes card-in { from { opacity: 0; transform: translateY(28px) scale(0.94); filter: blur(14px); } }
+    @keyframes card-out { to { opacity: 0; transform: translateY(-10px) scale(0.97); filter: blur(10px); } }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } }
+    @keyframes pop { from { opacity: 0; transform: scale(0.6); } }
+    @keyframes unveil { from { clip-path: inset(0 0 100% 0 round 20px); opacity: 0.4; } to { clip-path: inset(0 0 0 0 round 20px); } }
+    @keyframes kenburns { from { transform: scale(1.02); } to { transform: scale(1.1) translate(-1.5%, -1%); } }
+
+    .start { appearance: none; cursor: pointer; font: inherit; font-size: 24px; font-weight: 600; color: #fff;
+      padding: 24px 58px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16);
+      background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.95), rgba(var(--accent-rgb), 0.7));
+      box-shadow: 0 18px 50px rgba(var(--accent-rgb), 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      animation: invite 3.2s var(--ease) infinite; transition: transform 0.25s var(--spring); }
+    .start:active { transform: scale(0.96); }
+    @keyframes invite { 50% { box-shadow: 0 18px 70px rgba(var(--accent-rgb), 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.35); } }
+    .bottom { display: flex; justify-content: center; gap: 12px; min-height: 40px; }
+    .end { appearance: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
+      height: 40px; padding: 0 22px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+    .error { color: #ffb4b4; text-align: center; font-size: 15px; min-height: 1.2em; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="games.css?v=2" />
+</head>
+<body>
+  <div class="ambient"></div>
+  <div class="shell">
+    <header class="topbar">
+      <span class="brand">CYNOBOT</span>
+      <span class="pills">
+        <span class="pill hidden" id="mode"></span>
+        <span class="pill" id="status"><span class="dot"></span><span id="statusLabel">Offline</span></span>
+      </span>
+    </header>
+
+    <main class="stage">
+      <div class="caption" id="caption">Tap the screen to talk to Cynobot.</div>
+      <div class="you" id="you"></div>
+      <div class="card" id="card">
+        <div class="card-main">
+          <div class="card-text"><h2 class="reveal" id="cardTitle"></h2><p class="reveal" id="cardBody"></p></div>
+          <div class="qr hidden" id="cardQr"><img id="cardQrImg" alt="QR code" /><span class="reveal r3" id="cardQrLabel">Scan with your phone</span></div>
+        </div>
+        <div class="media hidden" id="cardMedia"><img id="cardImg" alt="" /></div>
+      </div>
+      <button class="start" id="btnStart">Tap to talk</button>
+      <div class="error" id="error"></div>
+    </main>
+
+    <footer class="bottom">
+      <button class="end hidden" id="btnGames">Games</button>
+      <button class="end hidden" id="btnEnd">End conversation</button>
+    </footer>
+  </div>
+  <audio id="botAudio" autoplay></audio>
+  <div class="games hidden" id="games"></div>
+
+  <script src="devices.js?v=1"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let pc = null;
+    let micStream = null;
+    // True from "Tap to talk" until "End conversation": if the link drops in between
+    // (e.g. Wi-Fi died), reconnect; the server then falls back to offline mode.
+    let wantVoice = false;
+    let sawLive = false;
+
+    // ---- Card: swap with a cross-fade only when the fact actually changes ----
+    const cardKey = (c) => (c ? [c.title, c.image || '', c.link || ''].join('|') : '');
+    let shownKey = '';
+    let swap = 0;
+
+    function loadImage(img, src) {
+      return new Promise((resolve) => {
+        if (!src) return resolve();
+        const done = () => resolve();
+        img.onload = done; img.onerror = done; img.src = src;
+        if (img.complete) resolve();
+        setTimeout(done, 800);  // never hold the card back for a slow picture
+      });
+    }
+
+    async function showCard(card) {
+      const key = cardKey(card);
+      if (key === shownKey) return;
+      shownKey = key;
+      const my = ++swap;
+      const el = $('card');
+      if (el.classList.contains('show')) {
+        el.classList.remove('enter'); void el.offsetWidth; el.classList.add('leave');
+        await new Promise((r) => setTimeout(r, 230));
+        if (my !== swap) return;
+      }
+      el.classList.remove('leave', 'enter', 'show');
+      document.body.classList.toggle('rich', Boolean(card && card.image));
+      if (!card) return;
+
+      $('cardTitle').textContent = card.title;
+      $('cardBody').textContent = card.body;
+      $('cardQr').classList.toggle('hidden', !card.link);
+      $('cardQrLabel').textContent = (card.link || '').startsWith('mailto:') ? 'Scan to email us' : 'Scan with your phone';
+      $('cardMedia').classList.toggle('hidden', !card.image);
+      await Promise.all([
+        loadImage($('cardImg'), card.image || ''),
+        loadImage($('cardQrImg'), card.link ? '/api/qr?data=' + encodeURIComponent(card.link) : ''),
+      ]);
+      if (my !== swap) return;
+      if (card.image) {
+        // Photos fill the frame and drift; logos and very wide or tall pictures are shown whole.
+        const ratio = $('cardImg').naturalWidth / ($('cardImg').naturalHeight || 1);
+        const photo = ratio > 1.2 && ratio < 2.6;
+        $('cardMedia').classList.toggle('photo', photo);
+        $('cardMedia').classList.toggle('whole', !photo);
+      }
+      void el.offsetWidth;
+      el.classList.add('show', 'enter');
+    }
+
+    // ---- State bus (shared with the face display) ----
+    let lastCaption = '';
+    function render(state) {
+      document.body.classList.toggle('theme-blue', state.theme === 'BLUE');
+      document.body.classList.toggle('thinking', state.expression === 'THINKING');
+      document.body.classList.toggle('speaking', state.expression === 'SPEAKING');
+
+      const text = state.last_spoken_text || '';
+      if (text && text !== lastCaption) {
+        const cap = $('caption');
+        // A new sentence (not the same one growing word by word) gets a soft entrance.
+        if (!text.startsWith(lastCaption.slice(0, 12))) { cap.classList.remove('fresh'); void cap.offsetWidth; cap.classList.add('fresh'); }
+        cap.textContent = text; lastCaption = text;
+      }
+      const you = state.user_text ? `“${state.user_text}”` : '';
+      if (you !== ($('you').textContent || '')) $('you').innerHTML = you ? '<span></span>' : '';
+      if (you) $('you').firstChild.textContent = you;
+      showCard(state.card || null);
+
+      const st = state.voice_status || 'OFFLINE';
+      // The server ended our live session (e.g. Gemini dropped): reconnect now rather
+      // than waiting several seconds for WebRTC to notice the hang-up.
+      if (st === 'LIVE') sawLive = true;
+      // Cynobot hung up because the visitor walked away: back to "Tap to talk", no reconnect.
+      if (st === 'OFFLINE' && state.session_end === 'idle') wantVoice = false;
+      if (st === 'OFFLINE' && sawLive && pc) { sawLive = false; dropped(pc); }
+      $('status').className = 'pill ' + st.toLowerCase();
+      $('statusLabel').textContent = st === 'LIVE' ? 'Listening' : st === 'CONNECTING' ? 'Connecting…' : 'Offline';
+      const live = st !== 'OFFLINE';
+      $('btnStart').classList.toggle('hidden', live || wantVoice);
+      $('btnEnd').classList.toggle('hidden', !live);
+      $('mode').classList.toggle('hidden', !live || !state.voice_mode);
+      $('mode').classList.toggle('offline-mode', state.voice_mode === 'OFFLINE');
+      $('mode').textContent = state.voice_mode === 'OFFLINE' ? 'Offline mode' : 'Online';
+      // Add-ons (device choice, games) follow the same state; a fault there must not stop the display.
+      try { if (window.CynoDevices) CynoDevices.onState(state); } catch (e) {}
+      try { if (window.CynoGames) CynoGames.onState(state); } catch (e) {}
+    }
+
+    function connectBus() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${location.host}/ws`);
+      ws.onmessage = (ev) => {
+        try { const msg = JSON.parse(ev.data); if (msg.state) render(msg.state); } catch (e) {}
+      };
+      ws.onclose = () => setTimeout(connectBus, 2000);
+    }
+    connectBus();
+
+    // ---- Voice link (WebRTC to the Pipecat pipeline) ----
+    function waitForIce(peer, timeoutMs = 2500) {
+      if (peer.iceGatheringState === 'complete') return Promise.resolve();
+      return new Promise((resolve) => {
+        const done = () => { peer.removeEventListener('icegatheringstatechange', check); resolve(); };
+        const check = () => { if (peer.iceGatheringState === 'complete') done(); };
+        peer.addEventListener('icegatheringstatechange', check);
+        setTimeout(done, timeoutMs);
+      });
+    }
+
+    async function startVoice() {
+      $('error').textContent = '';
+      try {
+        // Browser echo cancellation keeps Cynobot from hearing its own voice.
+        const mic = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: window.CynoDevices ? CynoDevices.audio(mic) : mic });
+        } catch (e) {
+          // The chosen microphone was unplugged: use the default one rather than failing.
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: mic });
+        }
+        if (window.CynoDevices) CynoDevices.refresh();  // device names are visible once the mic is allowed
+        pc = new RTCPeerConnection();
+        // Pipecat expects transceiver 0 = audio, 1 = video (video stays unused).
+        pc.addTransceiver(micStream.getAudioTracks()[0], { direction: 'sendrecv' });
+        pc.addTransceiver('video', { direction: 'sendrecv' });
+        pc.createDataChannel('chat');
+        pc.ontrack = (ev) => {
+          if (ev.track.kind === 'audio') $('botAudio').srcObject = ev.streams[0] || new MediaStream([ev.track]);
+        };
+        const thisPc = pc;
+        pc.onconnectionstatechange = () => {
+          if (['failed', 'closed', 'disconnected'].includes(thisPc.connectionState)) dropped(thisPc);
+        };
+        pc.oniceconnectionstatechange = () => {
+          if (['failed', 'closed', 'disconnected'].includes(thisPc.iceConnectionState)) dropped(thisPc);
+        };
+
+        await pc.setLocalDescription(await pc.createOffer());
+        await waitForIce(pc);
+        const res = await fetch('/api/offer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type }),
+        });
+        const answer = await res.json();
+        if (!res.ok || answer.error) throw new Error(answer.error || `Server error ${res.status}`);
+        await pc.setRemoteDescription(answer);
+      } catch (err) {
+        $('error').textContent = err.message || String(err);
+        wantVoice = false;
+        closeLink();
+      }
+    }
+
+    function closeLink() {
+      if (pc) { try { pc.close(); } catch (e) {} pc = null; }
+      if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+    }
+
+    function dropped(which) {
+      if (which !== pc) return;  // an old link we already replaced
+      closeLink();
+      if (wantVoice) setTimeout(() => { if (wantVoice && !pc) startVoice(); }, 500);
+    }
+
+    $('btnStart').addEventListener('click', () => { wantVoice = true; startVoice(); });
+    $('btnEnd').addEventListener('click', () => { wantVoice = false; closeLink(); });
+    // For the games add-on: start a conversation (Word Chain is played by voice).
+    window.CynoChest = { startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; startVoice(); } } };
+  </script>
+  <script src="games.js?v=2"></script>
+  <script src="kiosk.js?v=2"></script>
+</body>
+</html>

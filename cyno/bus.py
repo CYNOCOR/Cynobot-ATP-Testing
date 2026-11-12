@@ -1,6 +1,6 @@
 """State bus: one shared robot state, pushed to every display over WebSocket.
 
-The face display (Facial Expression Demo/index.html) and the chest display both
+The face display (cyno/web/face/index.html) and the chest display both
 connect to /ws and receive the same CYNO_STATE_UPDATE messages.
 """
 

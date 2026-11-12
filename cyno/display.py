@@ -39,3 +39,32 @@ def save_frame(frame: dict) -> dict:
     data["face_frame"] = frame
     PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return frame
+
+
+# ---- chest background (the particle scene) ----
+# auto: full scene, and the page lowers the particle count by itself if the frame rate drops.
+# full / light: a fixed particle count. off: a plain still background (no 3D at all).
+SCENES = ("auto", "full", "light", "off")
+
+# What the chest page last reported about its own speed (shown in Cyno Control).
+chest_stats: dict = {}
+
+
+def load_scene() -> str:
+    try:
+        value = json.loads(PATH.read_text(encoding="utf-8")).get("chest_scene")
+    except (OSError, ValueError):
+        value = None
+    return value if value in SCENES else "auto"
+
+
+def save_scene(value: str) -> str:
+    if value not in SCENES:
+        raise ValueError("Unknown background setting")
+    try:
+        data = json.loads(PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    data["chest_scene"] = value
+    PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return value

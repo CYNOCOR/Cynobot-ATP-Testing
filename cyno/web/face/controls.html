@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyno Bot — Operator Controls</title>
+  <style>
+    :root {
+      --bg: #120b0d;
+      --surface: #1b1114;
+      --surface-raised: #24161a;
+      --surface-hover: #2f1c22;
+      --border: #3b2229;
+      --border-subtle: #28171c;
+      --border-hover: #54303a;
+      --text: #fcecef;
+      --text-muted: #b08d95;
+      --text-dim: #7a5860;
+      --accent: #ff2a3c;
+      --accent-ink: #ffffff;
+      --status-ok: #ff2a3c;
+    }
+
+    body.theme-blue {
+      --bg: #0c1117;
+      --surface: #121923;
+      --surface-raised: #182230;
+      --surface-hover: #202d40;
+      --border: #26364d;
+      --border-subtle: #1a2536;
+      --border-hover: #355075;
+      --text: #eceff4;
+      --text-muted: #8b9eb7;
+      --text-dim: #5c6f87;
+      --accent: #00e5ff;
+      --accent-ink: #041218;
+      --status-ok: #00e5ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    .app-shell {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Header */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .conn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .conn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--status-ok);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Main Content */
+    .workspace {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .panel-readout {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg);
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    /* Buttons */
+    .btn {
+      appearance: none;
+      background: var(--surface-raised);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-hover);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn.active {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn.subtle {
+      background: transparent;
+      color: var(--text-muted);
+      border-color: var(--border);
+    }
+
+    .btn.subtle:hover {
+      color: var(--text);
+      background: var(--surface-raised);
+    }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .scenario-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    @media (max-width: 520px) {
+      .scenario-list {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .scenario-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    .scenario-card:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-hover);
+    }
+
+    .scenario-card-title {
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .scenario-card-desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Header -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-title">Cyno Bot Controller</span>
+        <div class="conn-pill">
+          <span class="conn-dot" id="connDot"></span>
+          <span id="connLabel">Synced with Display</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn subtle" onclick="openDisplayWindow()">Open Face Display</button>
+        <button class="btn" id="btnAutoDemo" onclick="toggleAutoDemo()">Auto Demo: Off</button>
+        <button class="btn subtle" onclick="resetIdleSim()">Reset</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="workspace">
+      <!-- Face Color Theme -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Face Color Theme</span>
+          <span class="panel-readout" id="themeReadout">Red</span>
+        </div>
+        <div class="button-group">
+          <button class="btn active" id="btnThemeRed" onclick="setFaceTheme('RED')">Red Theme</button>
+          <button class="btn" id="btnThemeBlue" onclick="setFaceTheme('BLUE')">Blue Theme</button>
+        </div>
+      </section>
+
+      <!-- Expressions -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Facial Expression</span>
+          <span class="panel-readout" id="exprReadout">Idle</span>
+        </div>
+        <div class="button-group">
+          <button class="btn active" id="btnExprIdle" onclick="setExpression('IDLE')">Idle</button>
+          <button class="btn" id="btnExprHappy" onclick="setExpression('HAPPY')">Happy</button>
+          <button class="btn" id="btnExprThinking" onclick="setExpression('THINKING')">Thinking</button>
+          <button class="btn" id="btnExprSpeaking" onclick="setExpression('SPEAKING')">Speaking</button>
+          <button class="btn subtle" onclick="triggerBlink()">Blink Once</button>
+        </div>
+      </section>
+
+      <!-- Preset Scenarios -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Reception Scenarios</span>
+          <span class="panel-readout" id="armReadout">Arm: Idle</span>
+        </div>
+        <div class="scenario-list">
+          <button class="scenario-card" onclick="triggerGreetSim()">
+            <span class="scenario-card-title">Visitor Approach</span>
+            <span class="scenario-card-desc">Wave gesture + welcome greeting</span>
+          </button>
+          <button class="scenario-card" onclick="triggerAskDemo()">
+            <span class="scenario-card-title">Auditorium Directions</span>
+            <span class="scenario-card-desc">Think pause + point left & reply</span>
+          </button>
+          <button class="scenario-card" onclick="triggerAdmissionsDemo()">
+            <span class="scenario-card-title">Admissions Inquiry</span>
+            <span class="scenario-card-desc">Point right + ground floor guidance</span>
+          </button>
+          <button class="scenario-card" onclick="resetIdleSim()">
+            <span class="scenario-card-title">Standby Mode</span>
+            <span class="scenario-card-desc">Center gaze and return to idle</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const CHANNEL_NAME = 'cyno_bot_sync_v1';
+    const STORAGE_KEY = 'cyno_bot_state_v1';
+    const bc = ('BroadcastChannel' in window) ? new BroadcastChannel(CHANNEL_NAME) : null;
+    let displayWin = null;
+
+    const themeReadout = document.getElementById('themeReadout');
+    const btnThemeRed = document.getElementById('btnThemeRed');
+    const btnThemeBlue = document.getElementById('btnThemeBlue');
+    const exprReadout = document.getElementById('exprReadout');
+    const armReadout = document.getElementById('armReadout');
+    const btnAutoDemo = document.getElementById('btnAutoDemo');
+
+    let currentState = {
+      theme: 'RED',
+      flow_step: 'IDLE',
+      expression: 'IDLE',
+      eye_x: 0.0,
+      eye_y: 0.0,
+      head_pan: 90,
+      head_tilt: 90,
+      arm_gesture_plan_b: 'IDLE',
+      last_spoken_text: 'Welcome to the University! How can I help you today?'
+    };
+
+    let autoDemoInterval = null;
+    let autoDemoStep = 0;
+
+    function openDisplayWindow() {
+      displayWin = window.open('index.html', 'CynoBotFaceDisplay', 'width=1024,height=600');
+      setTimeout(() => broadcastState(currentState, false), 350);
+    }
+
+    function broadcastState(state, shouldSpeak = false, action = null) {
+      currentState = { ...currentState, ...state };
+      updateControllerUI();
+
+      const payload = {
+        type: 'CYNO_STATE_UPDATE',
+        state: currentState,
+        speak: shouldSpeak,
+        action: action,
+        ts: Date.now()
+      };
+
+      if (bc) {
+        bc.postMessage(payload);
+      }
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {}
+
+      if (displayWin && !displayWin.closed) {
+        try { displayWin.postMessage(payload, '*'); } catch (e) {}
+      }
+      if (window.opener && !window.opener.closed) {
+        try { window.opener.postMessage(payload, '*'); } catch (e) {}
+      }
+    }
+
+    function updateControllerUI() {
+      const isBlue = currentState.theme === 'BLUE';
+      document.body.classList.toggle('theme-blue', isBlue);
+      if (themeReadout) themeReadout.textContent = isBlue ? 'Blue' : 'Red';
+      if (btnThemeRed) btnThemeRed.classList.toggle('active', !isBlue);
+      if (btnThemeBlue) btnThemeBlue.classList.toggle('active', isBlue);
+
+      exprReadout.textContent = currentState.expression || 'IDLE';
+      armReadout.textContent = `Arm: ${currentState.arm_gesture_plan_b || 'IDLE'}`;
+
+      const map = {
+        IDLE: 'btnExprIdle',
+        HAPPY: 'btnExprHappy',
+        GREET: 'btnExprHappy',
+        THINKING: 'btnExprThinking',
+        SPEAKING: 'btnExprSpeaking'
+      };
+      ['btnExprIdle', 'btnExprHappy', 'btnExprThinking', 'btnExprSpeaking'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', map[currentState.expression] === id);
+      });
+    }
+
+    function setFaceTheme(theme) {
+      broadcastState({ theme: theme === 'BLUE' ? 'BLUE' : 'RED' }, false);
+    }
+
+    function setExpression(expr) {
+      let spokenText = currentState.last_spoken_text;
+      let flow = currentState.flow_step;
+      let arm = 'IDLE';
+      let shouldSpeak = false;
+
+      if (expr === 'IDLE') {
+        flow = 'IDLE';
+        spokenText = 'Standing by at the University Entrance.';
+      } else if (expr === 'HAPPY' || expr === 'GREET') {
+        flow = 'GREET';
+        arm = 'WAVE';
+        spokenText = 'Hello there! Welcome to the University!';
+      } else if (expr === 'THINKING') {
+        flow = 'CONVERSE';
+        spokenText = 'Processing your question...';
+      } else if (expr === 'SPEAKING') {
+        flow = 'CONVERSE';
+        arm = 'POINT_RIGHT';
+        spokenText = 'Welcome to the University! The Admissions Office is on the Ground Floor to your right.';
+        shouldSpeak = true;
+      }
+
+      broadcastState({
+        flow_step: flow,
+        expression: expr,
+        arm_gesture_plan_b: arm,
+        last_spoken_text: spokenText
+      }, shouldSpeak);
+    }
+
+    function setGaze(normX, normY) {
+      const nx = Math.max(-1, Math.min(1, normX));
+      const ny = Math.max(-1, Math.min(1, normY));
+      const pan = Math.round(90 + nx * 40);
+      const tilt = Math.round(90 - ny * 15);
+
+      broadcastState({
+        eye_x: nx,
+        eye_y: ny,
+        head_pan: pan,
+        head_tilt: tilt,
+        flow_step: (nx === 0 && ny === 0) ? currentState.flow_step : 'ATTEND'
+      }, false);
+
+      sendTrackToBackend(true, nx, ny, 190, false);
+    }
+
+    function triggerBlink() {
+      broadcastState({}, false, 'BLINK');
+    }
+
+    function triggerGreetSim() {
+      const normX = currentState.eye_x || 0;
+      const normY = currentState.eye_y || 0;
+      const pan = Math.round(90 + normX * 40);
+      const tilt = Math.round(90 - normY * 15);
+
+      broadcastState({
+        flow_step: 'GREET',
+        expression: 'GREET',
+        eye_x: normX,
+        eye_y: normY,
+        head_pan: pan,
+        head_tilt: tilt,
+        arm_gesture_plan_b: 'WAVE',
+        last_spoken_text: 'Welcome to the university! How can I help you today?'
+      }, true);
+
+      sendTrackToBackend(true, normX, normY, 180, true);
+    }
+
+    function triggerAskDemo() {
+      broadcastState({
+        flow_step: 'CONVERSE',
+        expression: 'THINKING',
+        arm_gesture_plan_b: 'IDLE',
+        last_spoken_text: 'Finding directions to the Main Auditorium...'
+      }, false);
+
+      setTimeout(() => {
+        broadcastState({
+          flow_step: 'CONVERSE',
+          expression: 'SPEAKING',
+          arm_gesture_plan_b: 'POINT_LEFT',
+          last_spoken_text: 'The Main Auditorium is located on the First Floor, just past the central lobby.'
+        }, true);
+      }, 1600);
+    }
+
+    function triggerAdmissionsDemo() {
+      broadcastState({
+        flow_step: 'CONVERSE',
+        expression: 'SPEAKING',
+        arm_gesture_plan_b: 'POINT_RIGHT',
+        last_spoken_text: 'The Admissions Office is on the Ground Floor to your right.'
+      }, true);
+    }
+
+    function resetIdleSim() {
+      if (autoDemoInterval) {
+        toggleAutoDemo();
+      }
+      broadcastState({
+        flow_step: 'IDLE',
+        expression: 'IDLE',
+        eye_x: 0.0,
+        eye_y: 0.0,
+        head_pan: 90,
+        head_tilt: 90,
+        arm_gesture_plan_b: 'IDLE',
+        last_spoken_text: 'Welcome to the University! How can I help you today?'
+      }, false, 'STOP_SPEECH');
+
+      sendTrackToBackend(false, 0, 0, 200, false);
+    }
+
+    function toggleAutoDemo() {
+      if (autoDemoInterval) {
+        clearInterval(autoDemoInterval);
+        autoDemoInterval = null;
+        btnAutoDemo.textContent = 'Auto Demo: Off';
+        btnAutoDemo.classList.remove('active');
+        return;
+      }
+
+      btnAutoDemo.textContent = 'Auto Demo: On';
+      btnAutoDemo.classList.add('active');
+      autoDemoStep = 0;
+
+      const runStep = () => {
+        switch (autoDemoStep % 6) {
+          case 0:
+            setGaze(-0.65, 0);
+            break;
+          case 1:
+            setGaze(0.65, -0.2);
+            break;
+          case 2:
+            setGaze(0, 0);
+            triggerGreetSim();
+            break;
+          case 3:
+            setExpression('THINKING');
+            break;
+          case 4:
+            setExpression('SPEAKING');
+            break;
+          case 5:
+            broadcastState({
+              flow_step: 'IDLE',
+              expression: 'IDLE',
+              eye_x: 0,
+              eye_y: 0,
+              head_pan: 90,
+              head_tilt: 90,
+              arm_gesture_plan_b: 'IDLE',
+              last_spoken_text: 'Welcome to the University! How can I help you today?'
+            }, false);
+            break;
+        }
+        autoDemoStep++;
+      };
+
+      runStep();
+      autoDemoInterval = setInterval(runStep, 3500);
+    }
+
+    // Listen for state updates from Display or Backend
+    function handleIncomingMessage(msg) {
+      if (!msg || msg.type !== 'CYNO_STATE_UPDATE' || !msg.state) return;
+      currentState = { ...currentState, ...msg.state };
+      updateControllerUI();
+    }
+
+    if (bc) {
+      bc.onmessage = (ev) => handleIncomingMessage(ev.data);
+    }
+    window.addEventListener('message', (ev) => handleIncomingMessage(ev.data));
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === STORAGE_KEY && ev.newValue) {
+        try { handleIncomingMessage(JSON.parse(ev.newValue)); } catch (e) {}
+      }
+    });
+
+    function sendTrackToBackend(detected, normX, normY, dist, greet) {
+      if (location.protocol === 'file:') return;
+      fetch('/api/vision/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          person_detected: detected,
+          norm_x: normX,
+          norm_y: normY,
+          distance_cm: dist,
+          trigger_greet: greet
+        })
+      }).catch(() => {});
+    }
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.state) {
+          currentState = { ...currentState, ...parsed.state };
+        }
+      }
+    } catch (e) {}
+
+    updateControllerUI();
+  </script>
+</body>
+</html>

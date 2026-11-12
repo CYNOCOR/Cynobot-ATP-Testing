@@ -419,6 +419,8 @@
           <div class="row"><div class="row-main"><div class="row-title">Chest touchscreen</div><div class="row-sub">Microphone, speaker, captions and info cards</div></div><button class="btn" data-open="chest">Open</button></div>
           <div class="row"><div class="row-main"><div class="row-title">Locked chest screen</div><div class="row-sub" id="kioskSub">Full screen with no close button, so visitors can't close it. To unlock on the screen: tap the CYNOBOT logo 3 times, hold it for 10 seconds, then enter the PIN. Or unlock from here.</div></div>
             <div class="align-ctl"><input class="field" id="fKioskPin" type="password" inputmode="numeric" maxlength="8" placeholder="New PIN" style="width:110px" autocomplete="off" /><button class="btn" id="btnKioskPin">Set PIN</button><button class="btn primary" id="btnKiosk">Open locked</button></div></div>
+          <div class="row"><div class="row-main"><div class="row-title">Chest background</div><div class="row-sub" id="sceneSub">The moving particle scene on the new chest screen. Lower it if the screen feels slow.</div></div>
+            <select class="field" id="selScene" style="width:240px"><option value="auto">Automatic (recommended)</option><option value="full">Full: most particles</option><option value="light">Light: fewest particles</option><option value="off">Off: plain background</option></select></div>
           <div class="row"><div class="row-main"><div class="row-title">Face display</div><div class="row-sub">Second screen. Press F for fullscreen.</div></div><button class="btn" data-open="face">Open</button></div>
         </div>
       </div>
@@ -549,6 +551,15 @@
         <div class="warn" id="overlapWarn"></div>
         <label for="fFactImage">Picture on the chest screen</label>
         <div style="display:flex;gap:8px"><select class="field" id="fFactImage" style="flex:1"></select><button class="btn" id="btnAddPicture" type="button">Add picture…</button></div>
+        <label for="fFactIcon">Drawing the screen particles form</label>
+        <select class="field" id="fFactIcon" style="width:100%">
+          <option value="">Automatic (from the title and keywords)</option>
+          <option value="pin">Map pin: places</option><option value="cap">Graduation cap: programmes</option>
+          <option value="mail">Envelope: applying, email</option><option value="phone">Phone: contact</option>
+          <option value="book">Open book: library, facilities</option><option value="globe">Globe: partners</option>
+          <option value="people">People: staff, teams</option><option value="chip">Chip: Cynobot, technology</option>
+          <option value="building">Building: about IIT</option>
+        </select>
         <label for="fFactLink">Link shown as a QR code</label>
         <input class="field" id="fFactLink" placeholder="https://… or mailto:name@iit.ac.lk (directions, a form, an email)" />
         <span class="hint">Visitors scan it with their phone. Leave empty for no QR code.</span>
@@ -830,6 +841,24 @@ $('btnKiosk').addEventListener('click', async () => {
 });
 document.querySelector('[data-page="controls"]').addEventListener('click', loadKiosk);
 setInterval(() => { if ($('controls').classList.contains('active')) loadKiosk(); }, 4000);
+// ---------- chest background ----------
+async function loadScene() {
+  const r = await call('get_chest_scene'); if (!r) return;
+  if (document.activeElement !== $('selScene')) $('selScene').value = r.scene;
+  const st = r.stats || {};
+  const slow = /swiftshader|llvmpipe|software/i.test(st.renderer || '');
+  $('sceneSub').textContent = !r.running ? 'The moving particle scene on the new chest screen. Start Cyno to see how fast it runs.'
+    : st.scene === 'none' ? 'This browser has no 3D, so the chest screen is using its plain background.'
+    : st.fps != null && st.age_secs < 20 ? `Running at ${st.fps} frames a second with ${Number(st.particles).toLocaleString()} particles.` +
+        (slow ? ' This browser is drawing without the graphics chip, which is slow: choose Off.' : st.fps < 30 ? ' That is low: try Light or Off.' : st.fps < 45 ? ' Smooth enough; Light would be smoother.' : ' That is smooth.')
+    : 'The moving particle scene on the new chest screen. Open that screen to see how fast it runs.';
+}
+$('selScene').addEventListener('change', async () => {
+  const r = await call('set_chest_scene', $('selScene').value);
+  if (r && r.ok) { toast(r.live ? 'Chest background changed' : 'Saved. Used when Cyno starts.'); setTimeout(loadScene, 1200); }
+});
+document.querySelector('[data-page="controls"]').addEventListener('click', loadScene);
+setInterval(() => { if ($('controls').classList.contains('active')) loadScene(); }, 5000);
 // ---------- knowledge ----------
 let facts = [], editingId = null;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -878,6 +907,7 @@ function openFact(f) {
   $('fFactKeywords').value = f ? (f.keywords || []).join(', ') : '';
   $('fFactSource').value = f ? (f.source || '') : '';
   $('fFactLink').value = f ? (f.link || '') : '';
+  $('fFactIcon').value = f ? (f.icon || '') : '';
   fillPictures(f ? f.image : '');
   $('fFactVerified').checked = f ? f.verified !== false : true;
   $('btnDeleteFact').style.visibility = f ? 'visible' : 'hidden';
@@ -905,7 +935,7 @@ $('btnSaveFact').addEventListener('click', async () => {
   const r = await call('save_fact', {
     id: editingId, title: $('fFactTitle').value, answer: $('fFactAnswer').value,
     keywords: $('fFactKeywords').value, source: $('fFactSource').value, verified: $('fFactVerified').checked,
-    image: $('fFactImage').value, link: $('fFactLink').value.trim(),
+    image: $('fFactImage').value, link: $('fFactLink').value.trim(), icon: $('fFactIcon').value,
   });
   if (!r || r.ok === false) return;
   closeFact(); await loadKnowledge(); toast(editingId ? 'Fact updated' : 'Fact added');
@@ -1062,7 +1092,7 @@ applyTheme('auto');
 window.addEventListener('pywebviewready', async () => {
   api = window.pywebview.api;
   const prefs = await call('get_prefs'); if (prefs) applyTheme(prefs.appearance);
-  poll(); pollLogs(); loadFrame(); loadGames(); loadDevices(); loadKiosk();
+  poll(); pollLogs(); loadFrame(); loadGames(); loadDevices(); loadKiosk(); loadScene();
 });
 </script>
 </body>

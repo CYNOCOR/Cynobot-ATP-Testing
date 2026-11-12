@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cynobot — Particle Stage Test</title>
+  <!-- Design walk-through, step 1: the particle stage on its own. Not part of the chest screen yet. -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100vw; height: 100vh; overflow: hidden; background: #05050a; color: #f4f2f8;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+    .top { position: fixed; top: 22px; left: 32px; right: 32px; display: flex; justify-content: space-between; font-size: 13px; color: #9a98a8; }
+    .top b { font-weight: 600; letter-spacing: 0.3em; }
+    .line { position: fixed; left: 0; right: 0; bottom: 110px; text-align: center; font-size: clamp(22px, 3vw, 38px); font-weight: 300; letter-spacing: -0.01em; padding: 0 32px; }
+    .bar { position: fixed; left: 0; right: 0; bottom: 26px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; align-items: center; }
+    button { appearance: none; font: inherit; font-size: 14px; color: #f4f2f8; cursor: pointer; height: 40px; padding: 0 18px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    button.on { background: rgba(255, 255, 255, 0.2); }
+    label { font-size: 13px; color: #9a98a8; display: flex; align-items: center; gap: 8px; margin-left: 10px; }
+    .none { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; color: #9a98a8; }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div class="none" id="none">This browser can't show the 3D scene; Cynobot would use the plain background.</div>
+  <div class="top"><b>CYNOBOT</b><span id="stats"></span></div>
+  <div class="line" id="line"></div>
+  <div class="bar">
+    <button data-state="idle">Idle</button>
+    <button data-state="listen">Listening</button>
+    <button data-state="think">Thinking</button>
+    <button data-state="answer">Answering</button>
+    <button data-state="games">Games</button>
+    <button id="burst">Celebrate</button>
+    <button id="theme">Colour: Red</button>
+    <label>Voice <input type="range" id="level" min="0" max="100" value="0" /></label>
+    <label><input type="checkbox" id="talk" checked /> Pretend someone is talking</label>
+  </div>
+  <script src="particles.js?v=10"></script>
+  <script>
+    const stage = CynoParticles.create(document.getElementById('stage'));
+    if (!stage) document.getElementById('none').style.display = 'flex';
+    const LINES = { idle: "Hi, I'm Cynobot. Tap to talk.", listen: "I'm listening…", think: '', answer: 'The Main Campus is at 57 Ramakrishna Road.', games: 'Pick a game' };
+    let state = 'idle', theme = 'RED';
+    function show(s) {
+      state = s; if (stage) stage.setState(s);
+      document.getElementById('line').textContent = LINES[s];
+      document.querySelectorAll('[data-state]').forEach((b) => b.classList.toggle('on', b.dataset.state === s));
+    }
+    document.querySelectorAll('[data-state]').forEach((b) => b.addEventListener('click', () => show(b.dataset.state)));
+    document.getElementById('burst').onclick = () => stage && stage.burst();
+    document.getElementById('theme').onclick = (e) => { theme = theme === 'RED' ? 'BLUE' : 'RED'; stage && stage.setTheme(theme); e.target.textContent = 'Colour: ' + (theme === 'RED' ? 'Red' : 'Blue'); };
+    // Stand-in for a real voice: speech-like bursts while listening or answering.
+    setInterval(() => {
+      if (!stage) return;
+      const slider = Number(document.getElementById('level').value) / 100;
+      const talking = document.getElementById('talk').checked && (state === 'listen' || state === 'answer');
+      const t = performance.now() / 1000;
+      const fake = talking ? Math.max(0, Math.sin(t * 9) * 0.5 + Math.sin(t * 2.3) * 0.5) * 0.8 : 0;
+      stage.setLevel(Math.max(slider, fake));
+      const s = stage.stats();
+      document.getElementById('stats').textContent = `${s.fps} fps · ${s.particles.toLocaleString()} particles`;
+    }, 50);
+    show('idle');
+    window.stage = stage;
+    // ?bench=1: time each quality level for 3 seconds and report it to the server.
+    if (stage && new URLSearchParams(location.search).get('bench') === '1') (async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms)), out = [];
+      for (const scene of ['listen', 'answer']) {
+        show(scene);
+        for (const q of [0, 1, 2, 3]) { stage.setQuality(q); await wait(3200); const s = stage.stats(); out.push({ scene, particles: s.particles, fps: s.fps }); }
+      }
+      await fetch('/api/chest-stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bench: out, renderer: stage.stats().renderer, scene: `${innerWidth}x${innerHeight} @${devicePixelRatio}` }) });
+      document.title = 'bench done';
+    })();
+  </script>
+</body>
+</html>

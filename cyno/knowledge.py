@@ -140,6 +140,8 @@ def upsert(entry: dict) -> dict:
         "verified": bool(entry.get("verified", True)),
     }
     # Optional chest visuals: a picture from data/media and a link shown as a QR code.
+    if entry.get("icon") in ICONS:
+        stored["icon"] = entry["icon"]
     image = (entry.get("image") or "").strip()
     link = (entry.get("link") or "").strip()
     if image:
@@ -200,9 +202,34 @@ def qr_purpose(link: str) -> str:
     return f"QR code that opens the {domain} {page}"
 
 
+# The line drawing the chest particles form for a fact. A fact can set its own with "icon";
+# otherwise it is guessed from these words in the fact's id, title and keywords.
+ICONS = ("pin", "cap", "mail", "phone", "book", "globe", "people", "chip", "building")
+_ICON_WORDS = [  # first match wins, so the more specific topics come first
+    ("people", ("dean", "team", "staff", "lecturer")),
+    ("mail", ("apply", "admission process", "how to apply", "registration")),
+    ("phone", ("contact", "hotline", "phone")),
+    ("globe", ("partner", "universit")),
+    ("chip", ("cynobot", "cynocor", "robot")),
+    ("cap", ("degree", "undergraduate", "postgraduate", "foundation", "course", "programme")),
+    ("book", ("facilit", "library")),
+    ("pin", ("campus", "centre", "center", "office", "auditorium", "location", "address", "map")),
+    ("building", ("about iit", "history", "founded")),
+]
+
+
+def icon_for(entry: dict) -> str:
+    if entry.get("icon") in ICONS:
+        return entry["icon"]
+    text = " ".join([entry.get("id", ""), entry.get("title", ""), *entry.get("keywords", [])]).lower().replace("_", " ")
+    return next((icon for icon, words in _ICON_WORDS if any(w in text for w in words)), "")
+
+
 def card(entry: dict) -> dict:
     """What the chest display shows for a fact."""
     out = {"title": entry["title"], "body": entry["answer"]}
+    if icon_for(entry):
+        out["icon"] = icon_for(entry)
     if entry.get("image") and (MEDIA_DIR / entry["image"]).is_file():
         out["image"] = f"/media/{entry['image']}"
     if entry.get("link"):
