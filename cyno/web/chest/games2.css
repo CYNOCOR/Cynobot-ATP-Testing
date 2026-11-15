@@ -3,7 +3,7 @@
    horizon stays visible; thin type; glass tiles that lean in 3D; line icons instead of emoji.
    Play areas (cards, puzzle board, answers) use darker glass so they stay easy to read. */
 .games { position: fixed; inset: 0; z-index: 20; display: flex; padding: 22px 40px 28px;
-  background: linear-gradient(to bottom, rgba(5, 5, 10, 0.62), rgba(5, 5, 10, 0.34) 55%, rgba(5, 5, 10, 0.05));
+  background: linear-gradient(to bottom, rgba(var(--panel-rgb), 0.62), rgba(var(--panel-rgb), 0.34) 55%, rgba(var(--panel-rgb), 0.05));
   animation: g-fade 0.35s var(--ease) both; }
 @keyframes g-fade { from { opacity: 0; } }
 @keyframes g-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
@@ -31,7 +31,7 @@
 .g-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; width: 100%; max-height: 100%; align-content: center;
   transform: rotateX(calc(2deg - var(--gy, 0) * 4deg)) rotateY(calc(var(--gx, 0) * 6deg)); transition: transform 0.5s var(--ease); transform-style: preserve-3d; }
 .g-tile { position: relative; appearance: none; cursor: pointer; font: inherit; color: var(--text); text-align: left; padding: 20px 22px 18px; min-height: clamp(120px, 19vh, 172px);
-  border-radius: 28px; background: rgba(16, 16, 24, 0.46); border: 1px solid var(--glass-edge); display: flex; flex-direction: column; gap: 8px;
+  border-radius: 28px; background: rgba(var(--panel-rgb), 0.46); border: 1px solid var(--glass-edge); display: flex; flex-direction: column; gap: 8px;
   backdrop-filter: blur(30px) saturate(150%); -webkit-backdrop-filter: blur(30px) saturate(150%);
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: transform 0.3s var(--spring), border-color 0.3s; animation: tile-in 0.6s var(--spring) both; }
@@ -46,7 +46,7 @@
 .g-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: min(980px, 100%); }
 .g-options.one { grid-template-columns: minmax(0, 620px); justify-content: center; }
 .g-opt { appearance: none; cursor: pointer; font: inherit; font-size: 19px; font-weight: 400; color: var(--text); text-align: center;
-  min-height: 82px; padding: 14px 20px; border-radius: 24px; background: rgba(16, 16, 24, 0.5); border: 1px solid var(--glass-edge);
+  min-height: 82px; padding: 14px 20px; border-radius: 24px; background: rgba(var(--panel-rgb), 0.5); border: 1px solid var(--glass-edge);
   backdrop-filter: blur(26px) saturate(150%); -webkit-backdrop-filter: blur(26px) saturate(150%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: transform 0.25s var(--spring), background 0.3s, border-color 0.3s, box-shadow 0.3s; animation: rise-in 0.5s var(--spring) both; }
 .g-opt:nth-child(2) { animation-delay: 0.05s; } .g-opt:nth-child(3) { animation-delay: 0.1s; } .g-opt:nth-child(4) { animation-delay: 0.15s; }
@@ -62,7 +62,7 @@
 .g-card.up > div { transform: rotateY(180deg); }
 .g-card i { position: absolute; inset: 0; border-radius: 20px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   display: flex; align-items: center; justify-content: center; font-style: normal; border: 1px solid var(--glass-edge); }
-.g-card .back { background: rgba(16, 16, 24, 0.5); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+.g-card .back { background: rgba(var(--panel-rgb), 0.5); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1); font-size: 0; }
 .g-card .back::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: rgba(var(--accent-rgb), 0.75); box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.9); }
 .g-card .front { transform: rotateY(180deg); background: rgba(255, 255, 255, 0.1); border-color: rgba(var(--accent-rgb), 0.55);
@@ -73,7 +73,7 @@
 /* Picture puzzle */
 .g-puzzle { display: flex; gap: 24px; align-items: center; justify-content: center; width: 100%; min-height: 0; flex: 1; }
 .g-board { display: grid; gap: 3px; border-radius: 22px; overflow: hidden; padding: 0; border: 1px solid var(--glass-edge);
-  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), 0 0 0 8px rgba(16, 16, 24, 0.5); background: rgba(16, 16, 24, 0.6);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), 0 0 0 8px rgba(var(--panel-rgb), 0.5); background: rgba(var(--panel-rgb), 0.6);
   transform: rotateX(3deg); transition: transform 0.6s var(--ease), gap 0.5s var(--ease); }
 .g-piece { cursor: pointer; background-repeat: no-repeat; transition: filter 0.2s; }
 .g-piece.pick { filter: brightness(1.3); outline: 3px solid var(--accent); outline-offset: -3px; z-index: 1; }
@@ -97,7 +97,7 @@
 .g-badge { padding: 8px 18px; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
   color: #ffd778; background: rgba(255, 204, 77, 0.12); border: 1px solid rgba(255, 204, 77, 0.55); box-shadow: 0 0 26px rgba(255, 204, 77, 0.25); animation: pop 0.6s var(--spring) 0.2s both; }
 .g-result-card { display: flex; gap: 26px; align-items: center; padding: 26px 30px; border-radius: 30px; max-width: 900px; text-align: left;
-  background: rgba(16, 16, 24, 0.52); border: 1px solid var(--glass-edge); backdrop-filter: blur(34px) saturate(160%); -webkit-backdrop-filter: blur(34px) saturate(160%);
+  background: rgba(var(--panel-rgb), 0.52); border: 1px solid var(--glass-edge); backdrop-filter: blur(34px) saturate(160%); -webkit-backdrop-filter: blur(34px) saturate(160%);
   box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1); transform: rotateX(3deg) rotateY(-4deg); animation: card-in 0.7s var(--spring) both; }
 .g-result-card h2 { font-size: clamp(26px, 3.2vw, 42px); font-weight: 300; letter-spacing: -0.02em; margin-bottom: 10px; }
 .g-result-card p { font-size: 18px; font-weight: 300; line-height: 1.45; color: var(--muted); }

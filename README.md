@@ -38,6 +38,15 @@ The installer handles everything: uv, Python 3.12, all packages, Ollama and its 
 The start script launches Ollama and the server, then opens the chest and face pages in Chrome.
 On the chest page tap **Tap to talk** and allow the mic; on the face page press **F** for fullscreen.
 
+**After pulling new code**, double-click `update-windows.bat` (Windows) or run `bash update-mac.sh` (Mac). It installs
+any new Python packages in a minute or two; the full `setup-*` is only needed the first time.
+
+**If Start Cyno doesn't bring Cyno up,** the Overview page now says why in one sentence (a missing package, a busy port, a
+missing folder); the full output is on the Activity page.
+
+**If Cyno Control won't open:** it now says why. On Windows a message box names the problem (usually a missing
+package: run `update-windows.bat`), and the full details are saved in `cyno-control-error.log` in the Cyno folder.
+
 ### Cyno Control (the app)
 
 After setup, open **Cyno Control**: double-click `Cyno Control.command` (Mac) or `Cyno Control.bat` (Windows).
@@ -77,6 +86,9 @@ It runs everything without a terminal:
   *Controls > Displays > Chest background* sets how much it draws (Automatic, Full, Light, Off) and shows the
   frame rate the chest screen reports. With no 3D in the browser the page uses a plain background by itself.
   The previous design is kept at `/chest/classic.html`.
+- **Colours (both screens):** the face and chest screens read their colours from one file,
+  `cyno/web/shared/theme.css`, for the Red and the Blue theme: glow colour, text, background glow, glass tint and
+  the chest's particle colours. Change a value there and both screens follow, so they always match.
 - **Appearance:** Auto / Light / Dark switch at the bottom of the sidebar (remembered on this computer).
 - **Controls:** open the chest/face displays, set the face expression and color, start Ollama, run the speed
   benchmark, and simulate a Wi-Fi drop.

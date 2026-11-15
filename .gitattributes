@@ -1,0 +1,5 @@
+# Keep launcher scripts in the line endings their system needs, whichever computer committed them.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+*.command text eol=lf

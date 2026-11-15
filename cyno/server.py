@@ -37,6 +37,7 @@ ROOT = Path(__file__).resolve().parent
 # which a fresh copy on another laptop did not have: the server then failed to start.)
 FACE_DIR = ROOT / "web" / "face"
 CHEST_DIR = ROOT / "web" / "chest"
+SHARED_DIR = ROOT / "web" / "shared"  # theme.css: colours both screens use
 
 load_dotenv(ROOT.parent / ".env", override=True)
 
@@ -295,6 +296,7 @@ async def root():
 
 app.mount("/face", StaticFiles(directory=FACE_DIR, html=True), name="face")
 app.mount("/chest", StaticFiles(directory=CHEST_DIR, html=True), name="chest")
+app.mount("/shared", StaticFiles(directory=SHARED_DIR), name="shared")
 knowledge.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=knowledge.MEDIA_DIR), name="media")
 

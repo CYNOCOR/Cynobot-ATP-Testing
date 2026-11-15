@@ -9,6 +9,7 @@ The methods of `Api` are callable from the page as window.pywebview.api.<name>()
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -60,6 +61,23 @@ def _child_env() -> dict:
     return env
 
 
+def _explain_failure(code: int, tail: list[str]) -> dict:
+    """Turn the end of the server's output into one plain sentence for the Overview page."""
+    text = "\n".join(tail)
+    fix = "update-windows.bat" if IS_WIN else "update-mac.sh"
+    m = re.search(r"No module named '([\w\.]+)'", text)
+    if m:
+        detail = f"A Python package is missing ({m.group(1).split('.')[0]}). Run {fix}, then press Start Cyno."
+    elif re.search(r"address already in use|Errno 48|Errno 98|WinError 10048|only one usage of each socket", text, re.I):
+        detail = "Another program is using Cyno's port. Stop the other Cyno or change the port in Settings."
+    elif "does not exist" in text and "Directory" in text:
+        detail = "A folder the server needs is missing. Copy the whole cyno-brain folder again."
+    else:
+        last = next((l for l in reversed(tail) if re.search(r"Error|Exception|error:", l)), tail[-1] if tail else "")
+        detail = re.sub(r"^\d{4}-\d\d-\d\d [\d:.]+ \| \w+\s+\| ", "", last).strip()[:160] or f"It exited with code {code}."
+    return {"title": "Cyno stopped with an error", "detail": detail, "code": code}
+
+
 def _open_path(path: Path):
     if IS_WIN:
         os.startfile(path)  # noqa: S606
@@ -79,6 +97,8 @@ class Api:
         self._bench_running = False
         self._gemini_ok: bool | None = None
         self._lock = threading.Lock()
+        self._stopping = False  # we asked the server to stop, so its exit is not a failure
+        self._failure: dict | None = None  # why the server last stopped by itself
         psutil.cpu_percent(None)  # prime the CPU meter
         threading.Thread(target=self._watch_gemini, daemon=True).start()
 
@@ -102,9 +122,15 @@ class Api:
             self._logs.append((self._log_seq, line.rstrip()))
 
     def _pump(self, proc: subprocess.Popen):
+        tail: deque[str] = deque(maxlen=40)
         for line in proc.stdout:
             self._log(line)
-        self._log(f"--- server exited (code {proc.wait()}) ---")
+            if line.strip():
+                tail.append(line.rstrip())
+        code = proc.wait()
+        self._log(f"--- server exited (code {code}) ---")
+        if code != 0 and not self._stopping and proc is self._proc:
+            self._failure = _explain_failure(code, list(tail))
 
     def _watch_gemini(self):
         while True:
@@ -121,6 +147,13 @@ class Api:
     # ---------- status ----------
 
     def get_status(self):
+        try:
+            return self._status()
+        except Exception as e:  # never leave the page on "Checking…"; say what broke
+            self._log(f"[control] status check failed: {type(e).__name__}: {e}")
+            return {"error": f"{type(e).__name__}: {e}"}
+
+    def _status(self):
         state = self._get(f"{self._base()}/api/state")
         stats = self._get(f"{self._base()}/api/stats") if state else None
         tags = self._get(f"{OLLAMA}/api/tags")
@@ -153,30 +186,39 @@ class Api:
             },
             "force_offline": env.get("CYNO_FORCE_OFFLINE") == "1",
             "debug": env.get("CYNO_DEBUG") == "1",
+            "failure": self._failure if state is None and not self._owned_running() else None,
         }
 
     # ---------- server ----------
 
+    def _server_cmd(self) -> list[str]:
+        return [sys.executable, "-m", "cyno.server"]
+
     def start_server(self):
         if self._owned_running():
             return {"ok": True}
+        self._failure, self._stopping = None, False
         if self._get(f"{self._base()}/api/state"):
             return {"ok": False, "error": f"Another Cyno server is already using port {self._port()}. Stop it first."}
         kwargs = {}
         if IS_WIN:
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-        self._proc = subprocess.Popen(
-            [sys.executable, "-m", "cyno.server"],
-            cwd=ROOT,
-            env=_child_env(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-            **kwargs,
-        )
+        try:
+            self._proc = subprocess.Popen(
+                self._server_cmd(),
+                cwd=ROOT,
+                env=_child_env(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+                **kwargs,
+            )
+        except OSError as e:  # e.g. the Python in .venv is missing or damaged
+            self._failure = {"title": "Cyno couldn't start", "detail": f"{e}. Run {'setup-windows.bat' if IS_WIN else 'setup-mac.sh'} again.", "code": None}
+            return {"ok": False, "error": self._failure["detail"]}
         self._started_at = time.time()
         self._log("--- starting Cyno server ---")
         threading.Thread(target=self._pump, args=(self._proc,), daemon=True).start()
@@ -185,6 +227,7 @@ class Api:
     def stop_server(self):
         if not self._owned_running():
             return {"ok": True}
+        self._stopping = True
         self._proc.terminate()
         try:
             self._proc.wait(timeout=8)

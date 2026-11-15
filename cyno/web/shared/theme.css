@@ -1,0 +1,24 @@
+/* Cynobot colours, shared by the head (face) and chest screens so the two always match.
+   Change a value here and both screens follow, for the Red and the Blue theme.
+   Pages map these to their own names on `body` (not :root), so the Blue switch reaches them.
+
+   --cy-accent      the robot's glow colour (face rings, highlights, buttons)
+   --cy-text        main text
+   --cy-bg1..3      background glow: centre, middle, edge
+   --cy-panel-rgb   tint for dark glass panels (cards, tiles, keypad)
+   --cy-p1..3       chest particle colours along each shape (red, green, blue, 0-255) */
+:root {
+  --cy-accent: #ff2a3c; --cy-accent-rgb: 255, 42, 60;
+  --cy-text: #fcecef; --cy-text-rgb: 252, 236, 239;
+  --cy-bg1: #260508; --cy-bg2: #120204; --cy-bg3: #060102;
+  --cy-panel-rgb: 28, 8, 11;
+  --cy-p1: 255, 41, 61; --cy-p2: 184, 8, 26; --cy-p3: 255, 189, 194;
+  --cy-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+}
+body.theme-blue {
+  --cy-accent: #00e5ff; --cy-accent-rgb: 0, 229, 255;
+  --cy-text: #eceef2; --cy-text-rgb: 236, 238, 242;
+  --cy-bg1: #061427; --cy-bg2: #030814; --cy-bg3: #010308;
+  --cy-panel-rgb: 6, 15, 28;
+  --cy-p1: 0, 230, 255; --cy-p2: 0, 107, 217; --cy-p3: 199, 247, 255;
+}

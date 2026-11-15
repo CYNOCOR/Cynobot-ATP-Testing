@@ -9,3 +9,4 @@ data/greeting_cache/
 data/game_scores.json
 data/kiosk.json
 data/kiosk_profile/
+cyno-control-error.log

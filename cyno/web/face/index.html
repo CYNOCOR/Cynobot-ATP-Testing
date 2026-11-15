@@ -4,29 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cyno Bot — Face Display</title>
+  <link rel="stylesheet" href="/shared/theme.css?v=1" />
   <style>
-    :root {
-      --primary: #ff2a3c;
-      --primary-glow: rgba(255, 42, 60, 0.75);
-      --primary-border: rgba(255, 42, 60, 0.82);
-      --primary-border-soft: rgba(255, 42, 60, 0.32);
-      --visor-c1: #260508;
-      --visor-c2: #120204;
-      --visor-c3: #060102;
-      --pill-bg: rgba(28, 12, 14, 0.85);
-      --text: #fcecef;
-    }
-
-    body.theme-blue {
-      --primary: #00e5ff;
-      --primary-glow: rgba(0, 229, 255, 0.75);
-      --primary-border: rgba(0, 229, 255, 0.82);
-      --primary-border-soft: rgba(0, 229, 255, 0.32);
-      --visor-c1: #061427;
-      --visor-c2: #030814;
-      --visor-c3: #010308;
-      --pill-bg: rgba(14, 22, 34, 0.85);
-      --text: #eceef2;
+    /* Colours come from /shared/theme.css (also used by the chest screen); set on body so
+       the Blue theme class reaches them. */
+    body {
+      --primary: var(--cy-accent);
+      --primary-glow: rgba(var(--cy-accent-rgb), 0.75);
+      --primary-border: rgba(var(--cy-accent-rgb), 0.82);
+      --primary-border-soft: rgba(var(--cy-accent-rgb), 0.32);
+      --visor-c1: var(--cy-bg1);
+      --visor-c2: var(--cy-bg2);
+      --visor-c3: var(--cy-bg3);
+      --pill-bg: rgba(var(--cy-panel-rgb), 0.85);
+      --text: var(--cy-text);
     }
 
     * {
@@ -38,7 +29,7 @@
     html, body {
       background: #000000;
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+      font-family: var(--cy-font);
       width: 100vw;
       height: 100vh;
       overflow: hidden;

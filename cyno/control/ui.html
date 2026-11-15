@@ -579,6 +579,13 @@
   <div class="toast" id="toast"></div>
 
 <script>
+// Any script error while the page loads used to leave it frozen on "Checking…". Show it instead.
+window.addEventListener('error', (e) => {
+  const t = document.getElementById('heroTitle'), d = document.getElementById('heroSub');
+  if (t) t.textContent = 'Cyno Control has a problem';
+  if (d) d.textContent = `Page error: ${e.message} (line ${e.lineno}). Please send this to the team.`;
+});
+
 const $ = (id) => document.getElementById(id);
 let api = null;
 let lastStatus = null;
@@ -622,6 +629,7 @@ function render(s) {
   $('brandState').textContent = srv.starting ? 'Starting…' : !srv.running ? 'Stopped' : live ? (st.voice_mode === 'OFFLINE' ? 'Live · offline' : 'Live · online') : 'Ready';
 
   if (srv.starting) { $('heroTitle').textContent = 'Starting Cyno…'; $('heroSub').textContent = 'Loading the server. This takes a few seconds.'; }
+  else if (!srv.running && s.failure) { $('heroTitle').textContent = s.failure.title; $('heroSub').textContent = `${s.failure.detail} Full details are in Activity.`; }
   else if (!srv.running) { $('heroTitle').textContent = 'Cyno is stopped'; $('heroSub').textContent = 'Start the server to bring the robot online.'; }
   else if (live) { $('heroTitle').textContent = 'Cyno is listening'; $('heroSub').textContent = `${st.voice_mode === 'OFFLINE' ? 'Offline mode' : 'Online with Gemini'} · conversation ${fmtDur(stats && stats.session_s)}`; }
   else { $('heroTitle').textContent = 'Cyno is ready'; $('heroSub').textContent = 'Waiting for someone to tap “Tap to talk” on the chest screen.'; }
@@ -668,9 +676,20 @@ function render(s) {
 }
 
 async function poll() {
-  const s = await call('get_status');
-  if (s) render(s);
-  setTimeout(poll, 1000);
+  try {
+    const s = await call('get_status');
+    if (s && s.error) showStatusError(`Cyno Control could not read the status: ${s.error}`);
+    else if (s) render(s);
+    else showStatusError('Cyno Control did not get a status reply from its backend.');
+  } catch (e) {
+    showStatusError(`The status page hit an error: ${e && e.message ? e.message : e}`);
+  }
+  setTimeout(poll, 1000);  // always keep polling, even after an error
+}
+function showStatusError(msg) {
+  $('heroTitle').textContent = 'Cyno Control has a problem';
+  $('heroSub').textContent = msg;
+  [$('sGemini'), $('sOllama')].forEach(el => setStatus(el, false, 'Unknown'));
 }
 
 $('btnStart').addEventListener('click', async () => { await call('start_server'); toast('Starting Cyno…'); });
@@ -695,7 +714,7 @@ $('segTheme').addEventListener('click', async (e) => {
 // ---------- face alignment ----------
 let frame = null, frameDefault = null, frameTimer = null;
 function renderFrame() {
-  document.querySelectorAll('.align-ctl').forEach(c => {
+  document.querySelectorAll('.align-ctl[data-side]').forEach(c => {
     const v = frame[c.dataset.side];
     c.querySelector('input[type=range]').value = v;
     if (document.activeElement !== c.querySelector('.num')) c.querySelector('.num').value = v;
@@ -721,7 +740,7 @@ async function loadFrame() {
   const r = await call('get_face_frame');
   if (r) { frame = r.frame; frameDefault = r.default; renderFrame(); }
 }
-document.querySelectorAll('.align-ctl').forEach(c => {
+document.querySelectorAll('.align-ctl[data-side]').forEach(c => {
   const k = c.dataset.side;
   c.querySelector('input[type=range]').addEventListener('input', (e) => setFrame({ [k]: e.target.value }));
   c.querySelector('.num').addEventListener('change', (e) => setFrame({ [k]: e.target.value }));
@@ -1089,11 +1108,16 @@ $('segTheme2').addEventListener('click', async (e) => {
 });
 applyTheme('auto');
 
-window.addEventListener('pywebviewready', async () => {
+let booted = false;
+async function boot() {
+  if (booted) return; booted = true;
   api = window.pywebview.api;
-  const prefs = await call('get_prefs'); if (prefs) applyTheme(prefs.appearance);
   poll(); pollLogs(); loadFrame(); loadGames(); loadDevices(); loadKiosk(); loadScene();
-});
+  const prefs = await call('get_prefs'); if (prefs) applyTheme(prefs.appearance);
+}
+window.addEventListener('pywebviewready', boot);
+setTimeout(() => { if (!booted && window.pywebview && window.pywebview.api) boot(); }, 1500);
+setTimeout(() => { if (!booted) showStatusError('The app window could not reach its Python backend. Close Cyno Control and open it again; if it repeats, run update-windows.bat.'); }, 6000);
 </script>
 </body>
 </html>

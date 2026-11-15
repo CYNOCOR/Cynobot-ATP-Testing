@@ -84,10 +84,18 @@
       gl_FragColor = vec4(vColor.rgb * vColor.a * a, vColor.a * a);
     }`;
 
+  // Colours normally come from /shared/theme.css (--cy-p1..3), the file the face screen uses too.
+  // These are only for a page without it (stage-test.html).
   const THEMES = {
-    RED: [[1.0, 0.23, 0.31], [0.74, 0.36, 1.0], [0.23, 0.48, 1.0]],
-    BLUE: [[0.16, 0.85, 1.0], [0.43, 0.48, 1.0], [0.78, 0.36, 1.0]],
+    RED: [[1.0, 0.16, 0.24], [0.72, 0.03, 0.10], [1.0, 0.74, 0.76]],
+    BLUE: [[0.0, 0.9, 1.0], [0.0, 0.42, 0.85], [0.78, 0.97, 1.0]],
   };
+  // Read the theme's particle colours from the page's CSS; null if the page has none.
+  function cssColors() {
+    const st = getComputedStyle(document.body);
+    const out = ['--cy-p1', '--cy-p2', '--cy-p3'].map((n) => st.getPropertyValue(n).split(',').map((v) => parseFloat(v) / 255));
+    return out.every((c) => c.length === 3 && c.every((v) => v >= 0 && v <= 1)) ? out : null;
+  }
   // Behaviour per state: ripple, spin, wave strength, and where the shape sits (x, y).
   const STATES = {
     // framed: the shape is centred in the free area the page reports with setFrame().
@@ -217,7 +225,13 @@
     let spinAngle = 0;
     let frameY = 0.12, frameZoom = 1;  // defaults suit a page that never calls setFrame()
     cur.fy = STATES[state].framed ? frameY : 0; cur.fz = STATES[state].framed ? frameZoom : 1;
-    let mix = 1, mixStart = 0, level = 0, tiltX = 0, tiltY = 0, colors = THEMES[opts.theme] || THEMES.RED;
+    let mix = 1, mixStart = 0, level = 0, tiltX = 0, tiltY = 0, themeName = opts.theme || 'RED';
+    const pickColors = () => cssColors() || THEMES[themeName] || THEMES.RED;
+    let colors = pickColors();
+    // The page switches Red/Blue by a class on <body>; follow it (and fade to the new colours).
+    // Right after the page opens, jump straight to the theme (no red-to-blue fade on start).
+    const applyColors = () => { colors = pickColors(); if (clock < 2) curColors = colors.map((c) => c.slice()); };
+    new MutationObserver(applyColors).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     let curColors = colors.map((c) => c.slice());
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const MORPH_MS = reduced ? 1 : 1500;
@@ -319,7 +333,7 @@
       setTopic(name) { setState('topic', name); },
       /** 0..1 loudness of whoever is talking (visitor while listening, Cynobot while answering). */
       setLevel(v) { level = Math.max(0, Math.min(1, v || 0)); },
-      setTheme(name) { colors = THEMES[name] || THEMES.RED; },
+      setTheme(name) { themeName = name; applyColors(); },
       /** Free area for the face/ring/swirl: its centre (0 = top of screen, 1 = bottom) and height (0..1 of the screen). */
       setFrame(centre, height) {
         frameY = 1 - 2 * Math.max(0, Math.min(1, centre));
