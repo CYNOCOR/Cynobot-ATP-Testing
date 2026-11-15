@@ -422,6 +422,9 @@
           <div class="row"><div class="row-main"><div class="row-title">Chest background</div><div class="row-sub" id="sceneSub">The moving particle scene on the new chest screen. Lower it if the screen feels slow.</div></div>
             <select class="field" id="selScene" style="width:240px"><option value="auto">Automatic (recommended)</option><option value="full">Full: most particles</option><option value="light">Light: fewest particles</option><option value="off">Off: plain background</option></select></div>
           <div class="row"><div class="row-main"><div class="row-title">Face display</div><div class="row-sub">Second screen. Press F for fullscreen.</div></div><button class="btn" data-open="face">Open</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Calm face</div><div class="row-sub">Stops the face glancing around, breathing and hopping, and blinks steadily. Expressions still show.</div></div><label class="switch"><input type="checkbox" id="swCalm" /><span></span></label></div>
+          <div class="row"><div class="row-main"><div class="row-title">Face dozes off after</div><div class="row-sub">With nobody talking to Cynobot, the face gets sleepy. It wakes up when someone taps Tap to talk.</div></div>
+            <select class="field" id="selSleep" style="width:180px"><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option><option value="0">Never</option></select></div>
         </div>
       </div>
 
@@ -877,6 +880,21 @@ $('selScene').addEventListener('change', async () => {
   if (r && r.ok) { toast(r.live ? 'Chest background changed' : 'Saved. Used when Cyno starts.'); setTimeout(loadScene, 1200); }
 });
 document.querySelector('[data-page="controls"]').addEventListener('click', loadScene);
+// ---------- face life ----------
+async function loadLife() {
+  const r = await call('get_face_life'); if (!r) return;
+  $('swCalm').checked = Boolean(r.calm);
+  const sel = $('selSleep'), v = String(r.sleep_after);
+  if (![...sel.options].some((o) => o.value === v)) sel.add(new Option(`${Math.round(r.sleep_after / 60)} minutes`, v));
+  sel.value = v;
+}
+async function saveLife(change, msg) {
+  const r = await call('set_face_life', change);
+  if (r && r.ok) toast(r.live ? msg : 'Saved. Used when Cyno starts.');
+}
+$('swCalm').addEventListener('change', () => saveLife({ calm: $('swCalm').checked }, $('swCalm').checked ? 'Calm face on' : 'Calm face off'));
+$('selSleep').addEventListener('change', () => saveLife({ sleep_after: Number($('selSleep').value) }, 'Saved'));
+document.querySelector('[data-page="controls"]').addEventListener('click', loadLife);
 setInterval(() => { if ($('controls').classList.contains('active')) loadScene(); }, 5000);
 // ---------- knowledge ----------
 let facts = [], editingId = null;
@@ -1112,7 +1130,7 @@ let booted = false;
 async function boot() {
   if (booted) return; booted = true;
   api = window.pywebview.api;
-  poll(); pollLogs(); loadFrame(); loadGames(); loadDevices(); loadKiosk(); loadScene();
+  poll(); pollLogs(); loadFrame(); loadGames(); loadDevices(); loadKiosk(); loadScene(); loadLife();
   const prefs = await call('get_prefs'); if (prefs) applyTheme(prefs.appearance);
 }
 window.addEventListener('pywebviewready', boot);

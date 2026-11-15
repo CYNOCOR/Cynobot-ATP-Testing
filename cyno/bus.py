@@ -68,3 +68,27 @@ class StateBus:
             for ws in dead:
                 self._clients.discard(ws)
         logger.debug(f"state -> {changes}")
+
+    # Face moments ("love", "surprised", "wink"): a one-off expression the head screen shows
+    # for a couple of seconds, then it goes back to whatever it was doing.
+    MOMENTS = ("love", "surprised", "wink")
+
+    async def moment(self, name: str):
+        if name in self.MOMENTS:
+            await self.update(face_moment={"name": name, "id": int(time.time() * 1000)})
+
+    async def relay_level(self, sender: WebSocket, level: float):
+        """Cynobot's voice loudness, measured by the chest page as it plays: passed straight to
+        the other displays (the face's mouth follows it). Not stored in the state."""
+        payload = json.dumps({"type": "CYNO_LEVEL", "v": round(max(0.0, min(1.0, level)), 3)})
+        async with self._lock:
+            dead = []
+            for ws in self._clients:
+                if ws is sender:
+                    continue
+                try:
+                    await ws.send_text(payload)
+                except Exception:
+                    dead.append(ws)
+            for ws in dead:
+                self._clients.discard(ws)

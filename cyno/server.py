@@ -9,6 +9,7 @@ Run:  .venv/bin/python -m cyno.server
 """
 
 import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -44,6 +45,8 @@ load_dotenv(ROOT.parent / ".env", override=True)
 bus = StateBus()
 bus.state["face_frame"] = display.load_frame()  # glow-ring alignment for the head screen
 bus.state["chest_scene"] = display.load_scene()  # particle background: auto / full / light / off
+bus.state["face_life"] = display.load_life()  # head screen: calm switch and sleep timer
+bus.state["face_moment"] = None  # one-off face expression (hearts, wink, surprised)
 bus.state["devices"] = devices.load()  # chosen mic / speaker / camera names ("" = default)
 webrtc = SmallWebRTCRequestHandler()
 
@@ -66,7 +69,12 @@ async def ws_endpoint(ws: WebSocket):
     await bus.connect(ws)
     try:
         while True:
-            await ws.receive_text()  # displays only listen; keep the socket open
+            text = await ws.receive_text()  # displays mostly listen; the chest also sends its voice level
+            if text.startswith('{"type":"LEVEL"'):
+                try:
+                    await bus.relay_level(ws, float(json.loads(text).get("v", 0)))
+                except (ValueError, TypeError):
+                    pass
     except WebSocketDisconnect:
         pass
     finally:
@@ -130,6 +138,19 @@ async def set_face_frame(frame: dict):
     return frame
 
 
+@app.get("/api/face-life")
+async def get_face_life():
+    return bus.state["face_life"]
+
+
+@app.post("/api/face-life")
+async def set_face_life(body: dict):
+    """Cyno Control: Calm switch and how long before the face dozes off (applies at once)."""
+    life = display.save_life({**bus.state["face_life"], **body})
+    await bus.update(face_life=life)
+    return life
+
+
 @app.post("/api/chest-scene")
 async def set_chest_scene(body: dict):
     """Cyno Control: how much 3D the chest screen draws (applies at once)."""
@@ -188,7 +209,9 @@ async def get_games():
 @app.post("/api/games/score")
 async def post_game_score(body: dict):
     try:
-        return games.submit_score(str(body.get("game")), str(body.get("level", "")), body.get("score", 0))
+        result = games.submit_score(str(body.get("game")), str(body.get("level", "")), body.get("score", 0))
+        await bus.moment("surprised")  # a game finished: the face celebrates
+        return result
     except (ValueError, TypeError) as e:
         return Response(str(e), status_code=400)
 

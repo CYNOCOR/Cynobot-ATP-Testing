@@ -68,3 +68,38 @@ def save_scene(value: str) -> str:
     data["chest_scene"] = value
     PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return value
+
+
+# ---- face life (head screen): how lively the face is ----
+# calm: no glances, breathing or hops, and steadier blinks. sleep_after: seconds with no
+# conversation before the face dozes off (0 = never).
+DEFAULT_LIFE = {"calm": False, "sleep_after": 120}
+
+
+def _clean_life(life: dict) -> dict:
+    out = dict(DEFAULT_LIFE)
+    if "calm" in life:
+        out["calm"] = bool(life["calm"])
+    try:
+        out["sleep_after"] = max(0, min(3600, int(life.get("sleep_after", out["sleep_after"]))))
+    except (TypeError, ValueError):
+        pass
+    return out
+
+
+def load_life() -> dict:
+    try:
+        return _clean_life(json.loads(PATH.read_text(encoding="utf-8")).get("face_life") or {})
+    except (OSError, ValueError):
+        return dict(DEFAULT_LIFE)
+
+
+def save_life(life: dict) -> dict:
+    life = _clean_life(life)
+    try:
+        data = json.loads(PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    data["face_life"] = life
+    PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return life

@@ -38,6 +38,7 @@
 
   // ---------- shell ----------
   function shell(title, withTimer) {
+    clearMini();  // a new game screen replaces one that was moved aside
     root.innerHTML = `
       <div class="g-panel">
         <div class="g-head">
@@ -58,10 +59,12 @@
   function stopClock() { clearInterval(ticker); ticker = null; clearTimeout(closeTimer); closeTimer = null; }
 
   // The clock covers both limits: total play time, and (tap games and menus) time with no touch.
-  function startClock(limited, voiceGame) {
+  let clockMode = { limited: false, voiceGame: false };
+  function startClock(limited, voiceGame, leftMs) {
     stopClock();
+    clockMode = { limited, voiceGame };
     const total = cfg.time_limit_secs;
-    endsAt = Date.now() + total * 1000;
+    endsAt = Date.now() + (leftMs != null ? leftMs : total * 1000);
     lastTouch = Date.now();
     const tick = () => {
       const left = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
@@ -79,6 +82,7 @@
 
   function close() {
     stopClock();
+    clearMini();
     current = null;
     root.classList.add('hidden');
     root.innerHTML = '';
@@ -349,21 +353,103 @@
     drawChain($('gBody'));
   }
 
+  // ---------- a question mid-game ----------
+  // When the visitor asks Cynobot something during a game, the game steps aside (its clock
+  // paused) so the answer, card and QR code show properly. A button brings it back, and it
+  // returns by itself a little while after Cynobot finishes, or when the visitor says
+  // "back to the game".
+  const AUTO_RESUME_SECS = 20;
+  let mini = null;            // { left, title } while the game is moved aside
+  let resumeAt = 0, miniTicker = null;
+  let questionPending = false, requestText = null;  // what the visitor said when asking for a game
+  const pill = document.createElement('button');
+  pill.className = 'g-mini hidden';
+  pill.id = 'gMini';
+  document.body.appendChild(pill);
+  pill.addEventListener('click', () => resume());
+
+  function minimise() {
+    if (!isOpen() || mini) return;
+    if (!ticker) { close(); return; }  // the results screen: the game is over, so just make way
+    mini = {
+      left: clockMode.limited && ticker ? Math.max(1000, endsAt - Date.now()) : null,
+      title: current && game(current.id) ? game(current.id).title : 'Games',
+      mode: clockMode,
+    };
+    stopClock();
+    root.classList.add('hidden');  // the game stays as it was underneath; only hidden
+    resumeAt = 0;
+    drawPill();
+    pill.classList.remove('hidden');
+    miniTicker = setInterval(miniTick, 500);
+  }
+  function resume() {
+    if (!mini) return;
+    const m = mini;
+    clearMini();
+    root.classList.remove('hidden');
+    lastTouch = Date.now();
+    startClock(m.mode.limited, m.mode.voiceGame, m.left);
+  }
+  function clearMini() {
+    mini = null; resumeAt = 0;
+    clearInterval(miniTicker); miniTicker = null;
+    pill.classList.add('hidden');
+  }
+  function drawPill() {
+    if (!mini) return;
+    const left = mini.left != null ? Math.ceil(mini.left / 1000) : null;
+    const time = left != null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left` : '';
+    const back = resumeAt ? `Back in ${Math.max(0, Math.ceil((resumeAt - Date.now()) / 1000))} s` : '';
+    pill.innerHTML = `${svg('M10 6 4 12l6 6 M4 12h16')}<span><b>Back to ${esc(mini.title)}</b><small>${[time, back].filter(Boolean).join(' · ') || 'Tap to continue'}</small></span>`;
+  }
+  function miniTick() {
+    if (!mini) return;
+    const busy = state.expression === 'THINKING' || state.expression === 'SPEAKING';
+    if (busy) resumeAt = 0;                                   // still answering: wait
+    else if (!resumeAt) resumeAt = Date.now() + AUTO_RESUME_SECS * 1000;  // answer done: start the countdown
+    if (resumeAt && Date.now() >= resumeAt) { resume(); return; }
+    drawPill();
+  }
+  // A question is pending when the visitor says something that is not a game command; the game
+  // steps aside once Cynobot starts answering it.
+  function watchQuestion(prev, s) {
+    const said = s.user_text || '';
+    if (said && said !== (prev.user_text || '')) {
+      const wordChainMove = current && current.id === 'wordchain' && said.trim().split(/\s+/).length < 4;
+      const sameTurnAsRequest = requestText != null && said.startsWith(requestText);  // "let's play riddles… please"
+      questionPending = !wordChainMove && !sameTurnAsRequest;
+      if (mini) resumeAt = 0;  // another question while the game is aside: keep it aside
+    }
+    if (s.expression === 'SPEAKING' && prev.expression !== 'SPEAKING' && questionPending) {
+      questionPending = false;
+      if (s.voice_status === 'LIVE') minimise();
+    }
+    if (mini && s.session_end === 'idle' && s.voice_status === 'OFFLINE') close();  // the visitor walked away
+  }
+
   // ---------- wiring ----------
   window.CynoGames = {
     onState(s) {
+      const prev = state;
       state = s;
       if (s.games_rev !== rev) { rev = s.games_rev; loadConfig(); }
       const req = s.game_request;
       if (req && req.ts > lastRequest) {
         lastRequest = req.ts;
         // Ignore a request left over from before this page loaded.
-        if (cfg && cfg.enabled && req.ts > loadedAt - 3000) (req.id === 'menu' ? menu() : start(req.id));
+        if (cfg && cfg.enabled && req.ts > loadedAt - 3000) {
+          requestText = s.user_text || ''; questionPending = false;
+          if (mini && (req.id === 'resume' || req.id === 'menu' || (current && req.id === current.id))) resume();
+          else if (req.id === 'resume') { if (!isOpen()) menu(); }
+          else (req.id === 'menu' ? menu() : start(req.id));
+        }
       }
+      watchQuestion(prev, s);
       if (current && current.id === 'wordchain' && $('gBody') && current.chain) followChain();
     },
   };
-  $('btnGames').addEventListener('click', () => { if (cfg && cfg.enabled) menu(); });
+  $('btnGames').addEventListener('click', () => { if (mini) resume(); else if (cfg && cfg.enabled) menu(); });
   ['pointerdown', 'keydown'].forEach((ev) => root.addEventListener(ev, () => { lastTouch = Date.now(); }));
   loadConfig();
 })();

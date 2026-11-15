@@ -71,6 +71,9 @@ It runs everything without a terminal:
   plus a master switch. A game ends at the time limit (default 2 minutes) and a tap game closes after 30 seconds
   with no touch. Today's best per game is kept with no names (`data/game_scores.json`). Riddles and the degree
   quiz live in `data/game_content.json`; puzzle pictures are added on the Games page (`data/media/puzzles/`).
+  **A question mid-game:** when a visitor asks Cynobot something during a game, the game steps aside with its clock
+  paused, so the answer, card and QR code show. A *Back to …* button brings it back; it also returns by itself 20 seconds
+  after the answer, or when the visitor says "back to the game". In Word Chain a single word is a move, not a question.
 - **Devices** (Controls page): choose the microphone, speaker and camera Cynobot uses. Press *Find devices* with
   the chest screen open and allow the mic and camera once. Only Cynobot is affected, not the computer's sound
   settings, and it works the same on macOS and Windows (choosing a speaker needs Chrome or Edge).
@@ -86,6 +89,12 @@ It runs everything without a terminal:
   *Controls > Displays > Chest background* sets how much it draws (Automatic, Full, Light, Off) and shows the
   frame rate the chest screen reports. With no 3D in the browser the page uses a plain background by itself.
   The previous design is kept at `/chest/classic.html`.
+- **Face (head screen):** big sparkly eyes with blush, random blinks and glances, and a slow "breath". It listens
+  with a head tilt, looks up with "..." while thinking, and its mouth follows Cynobot's voice (the chest page sends
+  the loudness as it plays). Moments: heart eyes when a visitor says thank you or pays a compliment, a wink for
+  goodbye, surprised-then-happy when a game finishes, a glance down when a card appears, and it dozes off ("z z z")
+  when nobody has talked to it for a while, waking with a stretch. *Controls > Displays* has a *Calm face* switch
+  (no glances, breathing or hops) and *Face dozes off after* (1 to 10 minutes, or never), stored in `data/display.json`.
 - **Colours (both screens):** the face and chest screens read their colours from one file,
   `cyno/web/shared/theme.css`, for the Red and the Blue theme: glow colour, text, background glow, glass tint and
   the chest's particle colours. Change a value there and both screens follow, so they always match.

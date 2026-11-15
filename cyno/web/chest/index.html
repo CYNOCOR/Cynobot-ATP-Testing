@@ -153,7 +153,7 @@
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
   </style>
-  <link rel="stylesheet" href="games2.css?v=3" />
+  <link rel="stylesheet" href="games2.css?v=4" />
 </head>
 <body>
   <canvas id="stage"></canvas>
@@ -413,11 +413,18 @@
         return () => { an.getByteTimeDomainData(buf); let s = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / buf.length) * 4.5); };
       } catch (e) { return null; }
     }
+    let sentLevel = false;
     setInterval(() => {
-      if (!stage) return;
       const speaking = state.expression === 'SPEAKING';
       const read = speaking ? botMeter : micMeter;
-      stage.setLevel(pc && read ? read() : 0);
+      const v = pc && read ? read() : 0;
+      if (stage) stage.setLevel(v);
+      // The head screen's mouth follows Cynobot's voice: send its loudness while it speaks.
+      const talking = speaking && pc && botMeter;
+      if ((talking || sentLevel) && busWs && busWs.readyState === 1) {
+        busWs.send(JSON.stringify({ type: 'LEVEL', v: talking ? Math.round(v * 1000) / 1000 : 0 }));
+        sentLevel = Boolean(talking);
+      }
     }, 50);
 
     // ---- State bus (shared with the face display) ----
@@ -465,9 +472,10 @@
       try { if (window.CynoDevices) CynoDevices.onState(s); } catch (e) {}
       try { if (window.CynoGames) CynoGames.onState(s); } catch (e) {}
     }
+    let busWs = null;
     function connectBus() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${location.host}/ws`);
+      const ws = busWs = new WebSocket(`${proto}://${location.host}/ws`);
       ws.onmessage = (ev) => { try { const msg = JSON.parse(ev.data); if (msg.state) render(msg.state); } catch (e) {} };
       ws.onclose = () => setTimeout(connectBus, 2000);
     }
@@ -544,7 +552,7 @@
     // For the games add-on: start a conversation (Word Chain is played by voice).
     window.CynoChest = { startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; render(state); startVoice(); } } };
   </script>
-  <script src="games.js?v=2"></script>
+  <script src="games.js?v=4"></script>
   <script src="kiosk.js?v=2"></script>
 </body>
 </html>

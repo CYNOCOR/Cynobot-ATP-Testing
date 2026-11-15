@@ -4,214 +4,151 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cyno Bot — Face Display</title>
+  <!-- The head screen. Big sparkly eyes, blush, natural blinks and glances (step 1), short
+       moments for thanks / a game won / goodbye / a card / dozing off (step 2), and a mouth that
+       follows Cynobot's voice, sent by the chest page as it plays (step 3).
+       Colours come from /shared/theme.css (shared with the chest screen). -->
   <link rel="stylesheet" href="/shared/theme.css?v=1" />
   <style>
-    /* Colours come from /shared/theme.css (also used by the chest screen); set on body so
-       the Blue theme class reaches them. */
     body {
       --primary: var(--cy-accent);
-      --primary-glow: rgba(var(--cy-accent-rgb), 0.75);
-      --primary-border: rgba(var(--cy-accent-rgb), 0.82);
-      --primary-border-soft: rgba(var(--cy-accent-rgb), 0.32);
-      --visor-c1: var(--cy-bg1);
-      --visor-c2: var(--cy-bg2);
-      --visor-c3: var(--cy-bg3);
+      --rgb: var(--cy-accent-rgb);
+      --shine: var(--cy-p3);
       --pill-bg: rgba(var(--cy-panel-rgb), 0.85);
       --text: var(--cy-text);
     }
+    /* One design unit: 1px on an 800px-tall screen, so the face scales with any screen. */
+    :root { --u: 0.125vmin; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #000; color: var(--text); font-family: var(--cy-font); width: 100vw; height: 100vh;
+      overflow: hidden; user-select: none; -webkit-font-smoothing: antialiased; }
+    body.cursor-idle { cursor: none; }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html, body {
-      background: #000000;
-      color: var(--text);
-      font-family: var(--cy-font);
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      user-select: none;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    body.cursor-idle {
-      cursor: none;
-    }
-
-    /* Robot Face Visor Container */
-    .face-visor {
-      position: fixed;
-      /* Each side is adjustable from Cyno Control (Controls > Face alignment) to fit the head opening. */
-      top: var(--frame-top, 16px);
-      right: var(--frame-right, 16px);
-      bottom: var(--frame-bottom, 16px);
-      left: var(--frame-left, 16px);
-      background: radial-gradient(ellipse at center, var(--visor-c1) 0%, var(--visor-c2) 70%, var(--visor-c3) 100%);
-      border: 3.5px solid var(--primary-border);
+    /* The glowing frame. Each side is adjustable from Cyno Control (Controls > Face alignment). */
+    .face-visor { position: fixed; overflow: hidden;
+      top: var(--frame-top, 16px); right: var(--frame-right, 16px); bottom: var(--frame-bottom, 16px); left: var(--frame-left, 16px);
       border-radius: var(--frame-radius, 36px);
-      box-shadow:
-        0 0 20px var(--primary-glow),
-        0 0 48px var(--primary-border-soft),
-        inset 0 0 30px var(--primary-border-soft);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      animation: visorGlowPulse 4s infinite ease-in-out;
-      transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-      overflow: hidden;
-    }
+      background: radial-gradient(ellipse at center, var(--cy-bg1) 0%, var(--cy-bg2) 70%, var(--cy-bg3) 100%);
+      border: 3.5px solid rgba(var(--rgb), 0.82);
+      box-shadow: 0 0 20px rgba(var(--rgb), 0.75), 0 0 48px rgba(var(--rgb), 0.32), inset 0 0 30px rgba(var(--rgb), 0.32);
+      transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
 
-    @keyframes visorGlowPulse {
-      0%, 100% {
-        opacity: 0.94;
-      }
-      50% {
-        opacity: 1;
-      }
-    }
+    /* ---- the face ---- */
+    #face { position: absolute; inset: 0; --gx: 0; --gy: 0; --qx: 0; --qy: 0; --ox: 0; --oy: 0; --tilt: 0deg; --ps: 1; --es: 1; }
+    .breath { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: calc(46 * var(--u)); }
+    #face:not(.calm) .breath { animation: breathe 4.2s ease-in-out infinite; }
+    #face.sleepy:not(.calm) .breath { animation-duration: 6.5s; }
+    @keyframes breathe { 50% { transform: scale(1.018) translateY(calc(-3 * var(--u))); } }
 
-    .eyes-row {
-      display: flex;
-      gap: clamp(130px, 16vw, 175px);
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.15s ease-out;
-      margin-bottom: 20px;
-    }
+    .eyes { display: flex; gap: calc(150 * var(--u)); position: relative;
+      transform: translate(calc((var(--gx) + var(--qx) + var(--ox)) * 30 * var(--u)), calc((var(--gy) + var(--qy) + var(--oy)) * 16 * var(--u))) rotate(var(--tilt));
+      transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); }
+    .eye { position: relative; width: calc(250 * var(--u)); height: calc(250 * var(--u)); transform: scale(var(--es)); transition: transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1); }
+    .ring { position: absolute; inset: 0; border-radius: 50%; border: calc(18 * var(--u)) solid var(--primary);
+      box-shadow: 0 0 calc(40 * var(--u)) rgba(var(--rgb), 0.7), inset 0 0 calc(28 * var(--u)) rgba(var(--rgb), 0.55);
+      display: flex; align-items: center; justify-content: center;
+      clip-path: inset(-50% -50% -50% -50%);
+      transition: transform 0.07s ease-in, border-color 0.25s, border-width 0.25s, opacity 0.25s, clip-path 0.9s ease-in-out; }
+    .ring.blink { transform: scaleY(0.07) scaleX(1.08); transition-duration: 0.06s; }
+    /* Sparkle eyes: a dark core with a bright rim and two white shines. */
+    .pupil { position: relative; width: calc(104 * var(--u)); height: calc(104 * var(--u)); border-radius: 50%;
+      background: radial-gradient(circle at 50% 60%, var(--cy-bg3) 0%, var(--cy-bg2) 42%, rgba(var(--rgb), 0.75) 80%, rgb(var(--shine)) 100%);
+      box-shadow: 0 0 calc(20 * var(--u)) rgba(var(--rgb), 0.9), 0 0 2px rgb(var(--shine));
+      transform: translate(calc((var(--gx) + var(--qx) + var(--ox)) * 40 * var(--u)), calc((var(--gy) + var(--qy) + var(--oy)) * 40 * var(--u))) scale(var(--ps));
+      transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1), opacity 0.2s; }
+    .pupil i { position: absolute; border-radius: 50%; background: #fff; box-shadow: 0 0 calc(10 * var(--u)) rgba(255, 255, 255, 0.9); }
+    .pupil .s1 { width: 34%; height: 34%; left: 16%; top: 12%; }
+    .pupil .s2 { width: 13%; height: 13%; right: 20%; bottom: 20%; }
+    /* Sleepy: the top of the eye is hidden and a glowing eyelid line sits on the edge. */
+    .lid { position: absolute; left: calc(10 * var(--u)); right: calc(10 * var(--u)); top: calc(46% - 6 * var(--u)); height: calc(12 * var(--u));
+      border-radius: calc(6 * var(--u)); z-index: 2; background: var(--primary); box-shadow: 0 0 calc(16 * var(--u)) rgba(var(--rgb), 0.9);
+      opacity: 0; transform: scaleX(0.6); transition: opacity 0.5s 0.4s, transform 0.6s 0.4s; }
+    .heart { position: absolute; inset: calc(22 * var(--u)); opacity: 0; transform: scale(0.4);
+      transition: opacity 0.25s, transform 0.35s cubic-bezier(0.3, 1.7, 0.5, 1); filter: drop-shadow(0 0 calc(18 * var(--u)) rgba(var(--rgb), 0.95)); }
+    .heart path { fill: var(--primary); }
+    .blush { position: absolute; top: calc(205 * var(--u)); width: calc(120 * var(--u)); height: calc(48 * var(--u)); border-radius: 50%; opacity: 0; transition: opacity 0.5s;
+      background: radial-gradient(closest-side, rgba(var(--rgb), 0.8), rgba(var(--rgb), 0.3) 60%, transparent); filter: blur(2px); }
+    .eye.l .blush { left: calc(-54 * var(--u)); } .eye.r .blush { right: calc(-54 * var(--u)); }
 
-    .eye-ring {
-      width: clamp(170px, 34vmin, 220px);
-      height: clamp(170px, 34vmin, 220px);
-      border-radius: 50%;
-      border: clamp(16px, 3vmin, 20px) solid var(--primary);
-      box-shadow: 0 0 45px var(--primary-glow), inset 0 0 30px var(--primary-glow);
-      position: relative;
-      transition: all 0.22s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .mouth { margin-top: calc(34 * var(--u)); width: calc(72 * var(--u)); height: calc(26 * var(--u)); border: 0 solid var(--primary);
+      border-bottom-width: calc(7 * var(--u)); border-radius: 0 0 calc(50 * var(--u)) calc(50 * var(--u));
+      box-shadow: 0 calc(8 * var(--u)) calc(20 * var(--u)) calc(-6 * var(--u)) rgba(var(--rgb), 0.8);
+      transition: width 0.25s cubic-bezier(0.3, 1.4, 0.5, 1), height 0.25s cubic-bezier(0.3, 1.4, 0.5, 1), border-radius 0.25s, transform 0.3s; }
+    .mouth.talk { border-width: calc(7 * var(--u)); border-radius: 999px; transition: none;
+      box-shadow: 0 0 calc(18 * var(--u)) rgba(var(--rgb), 0.6), inset 0 0 calc(10 * var(--u)) rgba(var(--rgb), 0.4); }
 
-    .pupil {
-      width: clamp(44px, 8vmin, 56px);
-      height: clamp(44px, 8vmin, 56px);
-      background: #ffffff;
-      border-radius: 50%;
-      box-shadow: 0 0 20px #ffffff, 0 0 36px var(--primary);
-      transition: transform 0.12s ease-out, opacity 0.15s ease, box-shadow 0.25s ease;
-    }
+    .dots { position: absolute; top: 21%; right: 23%; display: flex; gap: calc(14 * var(--u)); opacity: 0; transition: opacity 0.3s; }
+    .dots i { width: calc(18 * var(--u)); height: calc(18 * var(--u)); border-radius: 50%; background: var(--primary);
+      box-shadow: 0 0 calc(14 * var(--u)) rgba(var(--rgb), 0.9); animation: dot 1.2s ease-in-out infinite; }
+    .dots i:nth-child(2) { animation-delay: 0.18s; } .dots i:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.45; } 30% { transform: translateY(calc(-14 * var(--u))); opacity: 1; } }
+    .zzz { position: absolute; top: 22%; right: 22%; opacity: 0; transition: opacity 0.6s; color: var(--primary);
+      font: 700 calc(64 * var(--u))/1 var(--cy-font); text-shadow: 0 0 calc(16 * var(--u)) rgba(var(--rgb), 0.9); }
+    .zzz span { position: absolute; animation: z 3.6s ease-in infinite; opacity: 0; }
+    .zzz span:nth-child(2) { animation-delay: 1.2s; font-size: calc(50 * var(--u)); } .zzz span:nth-child(3) { animation-delay: 2.4s; font-size: calc(38 * var(--u)); }
+    @keyframes z { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(calc(60 * var(--u)), calc(-110 * var(--u))) rotate(12deg); opacity: 0; } }
 
-    /* Blink state */
-    .eye-ring.blink {
-      height: 18px;
-      border-width: 9px;
-      border-radius: 14px;
-    }
-    .eye-ring.blink .pupil {
-      opacity: 0;
-    }
+    /* ---- expressions ---- */
+    #face.listen { --tilt: -6deg; --ps: 1.12; --es: 1.05; }
+    #face.think { --gx: 0.55; --gy: -0.7; --es: 0.96; }
+    #face.think .dots { opacity: 1; }
+    #face.think .mouth { width: calc(38 * var(--u)); height: calc(10 * var(--u)); border-radius: calc(6 * var(--u)); transform: translateX(calc(18 * var(--u))); }
+    #face.happy .ring, #face.wink .eye.r .ring { border-color: var(--primary) transparent transparent transparent; border-width: calc(26 * var(--u));
+      transform: translateY(calc(30 * var(--u))); box-shadow: none; filter: drop-shadow(0 0 calc(14 * var(--u)) rgba(var(--rgb), 0.9)); }
+    #face.happy .pupil, #face.wink .eye.r .pupil { opacity: 0; }
+    #face.happy .mouth, #face.wink .mouth, #face.love .mouth { width: calc(104 * var(--u)); height: calc(38 * var(--u)); }
+    #face.happy .blush, #face.love .blush, #face.wink .blush { opacity: 1; }
+    #face.love .ring { opacity: 0; transform: scale(0.6); }
+    #face.love .heart { opacity: 1; transform: scale(1); animation: beat 0.9s ease-in-out infinite 0.35s; }
+    @keyframes beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.12); } 40% { transform: scale(0.97); } }
+    #face.surprised { --es: 1.16; --ps: 0.7; }
+    #face.surprised .mouth { width: calc(58 * var(--u)); height: calc(66 * var(--u)); border-width: calc(7 * var(--u)); border-radius: 50%; }
+    #face.surprised:not(.calm) .breath { animation: hop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1); }
+    @keyframes hop { 40% { transform: translateY(calc(-26 * var(--u))); } }
+    #face.sleepy { --gy: 0.35; }
+    #face.sleepy .ring { clip-path: inset(46% -50% -50% -50%); }
+    #face.sleepy .lid { opacity: 1; transform: scaleX(1); }
+    #face.sleepy .zzz { opacity: 1; }
+    #face.sleepy .mouth { width: calc(34 * var(--u)); height: calc(8 * var(--u)); border-radius: calc(6 * var(--u)); }
+    #face.wake .eye { animation: stretch 0.9s cubic-bezier(0.3, 1.5, 0.5, 1); }
+    @keyframes stretch { 0% { transform: scaleY(0.4); } 35% { transform: scaleY(1.18) scaleX(0.92); } 60% { transform: scaleY(0.94) scaleX(1.04); } 100% { transform: scale(1); } }
+    /* A card appeared on the chest: a quick look down at it (works while talking too). */
+    #face.glance-down { --gx: -0.15; --gy: 1; --qx: 0; --qy: 0; }
+    #face.calm .eyes, #face.calm .eye { transition-duration: 0.6s; transition-timing-function: ease; }
+    @media (prefers-reduced-motion: reduce) { #face .breath { animation: none !important; } }
 
-    /* Happy / Greet state */
-    .eye-ring.happy {
-      border-bottom-color: transparent;
-      border-left-color: transparent;
-      border-right-color: transparent;
-      border-top-width: 28px;
-      transform: translateY(26px);
-    }
-
-    /* Thinking state */
-    .eye-ring.thinking {
-      animation: spinPulse 1.1s infinite ease-in-out;
-      border-style: dashed;
-    }
-    @keyframes spinPulse {
-      0% { transform: rotate(0deg) scale(0.95); }
-      50% { transform: rotate(180deg) scale(1.05); }
-      100% { transform: rotate(360deg) scale(0.95); }
-    }
-
-    /* Mouth / Smile Curve */
-    .mouth {
-      margin-top: clamp(20px, 4.5vmin, 38px);
-      width: clamp(100px, 18vmin, 130px);
-      height: clamp(32px, 5.8vmin, 44px);
-      border-bottom: 8px solid var(--primary);
-      border-radius: 0 0 70px 70px;
-      box-shadow: 0 8px 24px var(--primary-glow);
-      transition: all 0.2s ease;
-    }
-
-    .mouth.speaking {
-      animation: talkWave 0.28s infinite alternate ease-in-out;
-      border-radius: 30px;
-      border: 7px solid var(--primary);
-      height: 42px;
-    }
-    @keyframes talkWave {
-      0% { transform: scaleY(0.45) scaleX(0.9); }
-      100% { transform: scaleY(1.25) scaleX(1.15); }
-    }
-
-    /* Auto-hiding Corner Utility Bar */
-    .corner-bar {
-      position: fixed;
-      top: 32px;
-      right: 34px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      z-index: 100;
-      opacity: 1;
-      transition: opacity 0.3s ease;
-    }
-
-    body.cursor-idle .corner-bar {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .pill-btn {
-      appearance: none;
-      background: var(--pill-bg);
-      color: var(--text);
-      border: 1px solid var(--primary-border-soft);
-      padding: 7px 15px;
-      border-radius: 999px;
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      backdrop-filter: blur(8px);
-      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-    }
-
-    .pill-btn:hover {
-      background: var(--primary);
-      color: #061018;
-      border-color: var(--primary);
-    }
+    /* Auto-hiding corner buttons */
+    .corner-bar { position: fixed; top: 32px; right: 34px; display: flex; align-items: center; gap: 8px; z-index: 100; opacity: 1; transition: opacity 0.3s ease; }
+    body.cursor-idle .corner-bar { opacity: 0; pointer-events: none; }
+    .pill-btn { appearance: none; background: var(--pill-bg); color: var(--text); border: 1px solid rgba(var(--rgb), 0.32); padding: 7px 15px;
+      border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; backdrop-filter: blur(8px);
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .pill-btn:hover { background: var(--primary); color: #061018; border-color: var(--primary); }
   </style>
 </head>
 <body>
-  <!-- Auto-hiding utility actions (fades out when mouse is still) -->
   <div class="corner-bar">
     <button class="pill-btn" id="btnToggleTheme" onclick="toggleFaceTheme()">Color: Red</button>
     <button class="pill-btn" onclick="openControllerWindow()">Open Controls Window</button>
     <button class="pill-btn" onclick="toggleFullScreen()">Fullscreen</button>
   </div>
 
-  <!-- Robot Face Visor Container -->
   <div class="face-visor" id="visor">
-    <div class="eyes-row" id="eyesRow">
-      <div class="eye-ring" id="leftEye"><div class="pupil" id="leftPupil"></div></div>
-      <div class="eye-ring" id="rightEye"><div class="pupil" id="rightPupil"></div></div>
+    <div id="face" class="idle">
+      <div class="breath">
+        <div class="eyes">
+          <div class="eye l"><div class="ring"><div class="pupil"><i class="s1"></i><i class="s2"></i></div></div><div class="lid"></div>
+            <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></svg>
+            <div class="blush"></div></div>
+          <div class="eye r"><div class="ring"><div class="pupil"><i class="s1"></i><i class="s2"></i></div></div><div class="lid"></div>
+            <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></svg>
+            <div class="blush"></div></div>
+        </div>
+        <div class="mouth" id="mouth"></div>
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="zzz"><span>z</span><span>z</span><span>z</span></div>
+      </div>
     </div>
-    <div class="mouth" id="mouth"></div>
   </div>
 
   <script>
@@ -220,105 +157,44 @@
     const bc = ('BroadcastChannel' in window) ? new BroadcastChannel(CHANNEL_NAME) : null;
     let controllerWin = null;
 
-    const eyesRow = document.getElementById('eyesRow');
-    const leftEye = document.getElementById('leftEye');
-    const rightEye = document.getElementById('rightEye');
-    const leftPupil = document.getElementById('leftPupil');
-    const rightPupil = document.getElementById('rightPupil');
+    const face = document.getElementById('face');
     const mouth = document.getElementById('mouth');
+    const rings = [...document.querySelectorAll('#face .ring')];
     const btnToggleTheme = document.getElementById('btnToggleTheme');
+    const EXPRESSIONS = ['idle', 'listen', 'think', 'speak', 'happy', 'love', 'surprised', 'sleepy', 'wake', 'wink'];
 
-    let currentState = {
-      theme: 'RED',
-      flow_step: 'IDLE',
-      expression: 'IDLE',
-      eye_x: 0.0,
-      eye_y: 0.0,
-      head_pan: 90,
-      head_tilt: 90,
-      arm_gesture_plan_b: 'IDLE',
-      last_spoken_text: 'Welcome to the University! How can I help you today?'
-    };
+    let currentState = { theme: 'RED', expression: 'IDLE', eye_x: 0, eye_y: 0, voice_status: 'OFFLINE', card: null,
+      face_life: { calm: false, sleep_after: 120 }, last_spoken_text: '' };
 
-    let speakingTimeout = null;
+    // ---------- page chrome (unchanged) ----------
     let idleCursorTimer = null;
-
-    // Auto-hide corner buttons and cursor when mouse is inactive
     function resetCursorIdle() {
       document.body.classList.remove('cursor-idle');
       clearTimeout(idleCursorTimer);
-      idleCursorTimer = setTimeout(() => {
-        document.body.classList.add('cursor-idle');
-      }, 2600);
+      idleCursorTimer = setTimeout(() => document.body.classList.add('cursor-idle'), 2600);
     }
     window.addEventListener('mousemove', resetCursorIdle);
     window.addEventListener('mousedown', resetCursorIdle);
     resetCursorIdle();
 
-    function openControllerWindow() {
-      controllerWin = window.open('controls.html', 'CynoBotControls', 'width=860,height=680');
-    }
-
+    function openControllerWindow() { controllerWin = window.open('controls.html', 'CynoBotControls', 'width=860,height=680'); }
     function toggleFaceTheme() {
       const nextTheme = currentState.theme === 'BLUE' ? 'RED' : 'BLUE';
       applyRobotState({ theme: nextTheme }, false);
-      const payload = {
-        type: 'CYNO_STATE_UPDATE',
-        state: currentState,
-        speak: false,
-        action: null,
-        ts: Date.now()
-      };
+      const payload = { type: 'CYNO_STATE_UPDATE', state: currentState, speak: false, action: null, ts: Date.now() };
       if (bc) bc.postMessage(payload);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (e) {}
-      if (controllerWin && !controllerWin.closed) {
-        try { controllerWin.postMessage(payload, '*'); } catch (e) {}
-      }
-      if (window.opener && !window.opener.closed) {
-        try { window.opener.postMessage(payload, '*'); } catch (e) {}
-      }
+      if (controllerWin && !controllerWin.closed) { try { controllerWin.postMessage(payload, '*'); } catch (e) {} }
+      if (window.opener && !window.opener.closed) { try { window.opener.postMessage(payload, '*'); } catch (e) {} }
     }
-
     function toggleFullScreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+      else if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
     }
-
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'f' || e.key === 'F') {
-        toggleFullScreen();
-      } else if (e.key === 'c' || e.key === 'C') {
-        openControllerWindow();
-      }
+      if (e.key === 'f' || e.key === 'F') toggleFullScreen();
+      else if (e.key === 'c' || e.key === 'C') openControllerWindow();
     });
-
-    function triggerBlink() {
-      leftEye.classList.add('blink');
-      rightEye.classList.add('blink');
-      setTimeout(() => {
-        leftEye.classList.remove('blink');
-        rightEye.classList.remove('blink');
-      }, 220);
-    }
-
-    function speakText(text) {
-      if (!('speechSynthesis' in window) || !text) return;
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'en-US';
-      utter.rate = 1.02;
-      utter.onstart = () => mouth.classList.add('speaking');
-      utter.onend = () => {
-        if (currentState.expression !== 'SPEAKING') {
-          mouth.classList.remove('speaking');
-        }
-      };
-      window.speechSynthesis.speak(utter);
-    }
-
     // Glow-ring position, nudged per side from Cyno Control so it lines up with the head opening.
     function applyFaceFrame(f) {
       const root = document.documentElement.style;
@@ -327,94 +203,182 @@
       });
     }
 
+    // ---------- what the face should show ----------
+    let moment = null, momentTimer = 0;       // a one-off expression (hearts, wink, surprised, wake)
+    let lastMomentId = null, lastCardKey = null;
+    let lastActivity = Date.now(), sleeping = false;
+    let ttsSpeaking = false, speakingTimeout = null, glanceDownTimer = 0;
+
+    const calm = () => Boolean(currentState.face_life && currentState.face_life.calm);
+
+    function baseExpression() {
+      const s = currentState;
+      if (ttsSpeaking) return 'speak';
+      if (s.expression === 'GREET' || s.expression === 'HAPPY') return 'happy';
+      if (s.expression === 'THINKING') return 'think';
+      if (s.expression === 'SPEAKING') return 'speak';
+      if (s.voice_status === 'LIVE' || s.voice_status === 'CONNECTING') return 'listen';
+      return 'idle';
+    }
+    function showMoment(name, ms, then) {
+      clearTimeout(momentTimer);
+      moment = name; render();
+      momentTimer = setTimeout(() => { moment = null; if (then) showMoment(then[0], then[1]); else render(); }, ms);
+    }
+    function render() {
+      const x = moment || (sleeping ? 'sleepy' : baseExpression());
+      EXPRESSIONS.forEach((e) => face.classList.toggle(e, e === x));
+      face.classList.toggle('calm', calm());
+      face.style.setProperty('--ox', (Number(currentState.eye_x) || 0).toFixed(2));  // operator eye control
+      face.style.setProperty('--oy', (Number(currentState.eye_y) || 0).toFixed(2));
+      if (x === 'speak') startMouth(); else stopMouth();
+    }
+
+    // ---------- Step 2: moments ----------
+    function noteActivity() {
+      lastActivity = Date.now();
+      if (sleeping) { sleeping = false; showMoment('wake', 1100, ['happy', 1300]); }
+    }
+    function busy() {
+      const s = currentState;
+      return s.voice_status !== 'OFFLINE' || (s.expression && s.expression !== 'IDLE') || ttsSpeaking;
+    }
+    setInterval(() => {  // doze off when nobody has talked to Cynobot for a while
+      const after = Number(currentState.face_life && currentState.face_life.sleep_after) || 0;
+      if (busy()) { noteActivity(); return; }
+      if (!sleeping && !moment && after > 0 && Date.now() - lastActivity > after * 1000) { sleeping = true; render(); }
+    }, 1000);
+
+    function onMoment(m) {
+      if (!m || !m.id || m.id === lastMomentId) return;
+      const fresh = Date.now() - m.id < 5000;  // ignore an old one replayed when the page connects
+      lastMomentId = m.id;
+      if (!fresh) return;
+      noteActivity();
+      if (m.name === 'love') showMoment('love', 2600);
+      else if (m.name === 'wink') { blinkNow(); showMoment('wink', 2000); }
+      else if (m.name === 'surprised') showMoment('surprised', 1400, ['happy', 1500]);
+    }
+    function onCard(card) {
+      const key = card ? (card.id || card.title || JSON.stringify(card).slice(0, 80)) : null;
+      if (key && key !== lastCardKey) {
+        clearTimeout(glanceDownTimer);
+        face.classList.add('glance-down');
+        glanceDownTimer = setTimeout(() => face.classList.remove('glance-down'), 2200);
+      }
+      lastCardKey = key;
+    }
+
+    // ---------- Step 1: blinks (random, sometimes double) and glances ----------
+    function blinkNow() {
+      rings.forEach((r) => r.classList.add('blink'));
+      setTimeout(() => rings.forEach((r) => r.classList.remove('blink')), 120);
+    }
+    (function blinkLoop() {
+      const x = moment || (sleeping ? 'sleepy' : baseExpression());
+      if (!['happy', 'love', 'sleepy', 'wink', 'wake'].includes(x)) {
+        blinkNow();
+        if (!calm() && Math.random() < 0.22) setTimeout(blinkNow, 260);
+      }
+      setTimeout(blinkLoop, calm() ? 5000 : 2000 + Math.random() * 4000);
+    })();
+    (function glanceLoop() {
+      const x = moment || (sleeping ? 'sleepy' : baseExpression());
+      if (!calm() && (x === 'idle' || x === 'listen')) {
+        face.style.setProperty('--qx', (Math.random() * 1.2 - 0.6).toFixed(2));
+        face.style.setProperty('--qy', (Math.random() * 0.8 - 0.4).toFixed(2));
+        setTimeout(() => { face.style.setProperty('--qx', 0); face.style.setProperty('--qy', 0); }, 700 + Math.random() * 900);
+      }
+      setTimeout(glanceLoop, 3000 + Math.random() * 4000);
+    })();
+
+    // ---------- Step 3: the mouth follows Cynobot's voice ----------
+    // The chest page measures the voice as it plays and sends it here (CYNO_LEVEL). If none
+    // arrives (an older chest page, or the browser's own speech), a made-up rhythm is used.
+    let level = 0, target = 0, levelAt = 0, mouthOn = false, fakeTimer = 0;
+    function mouthFrame() {
+      if (!mouthOn) return;
+      level += (target - level) * 0.45;
+      mouth.style.width = `calc(${(62 + level * 34).toFixed(1)} * var(--u))`;
+      mouth.style.height = `calc(${(12 + level * 52).toFixed(1)} * var(--u))`;
+      requestAnimationFrame(mouthFrame);
+    }
+    function fakeSyllables() {
+      clearTimeout(fakeTimer);
+      if (!mouthOn) return;
+      if (Date.now() - levelAt < 400) { fakeTimer = setTimeout(fakeSyllables, 200); return; }  // real level is arriving
+      target = 0.35 + Math.random() * 0.65;
+      fakeTimer = setTimeout(() => {
+        if (Date.now() - levelAt >= 400) target = 0.05 + Math.random() * 0.12;
+        fakeTimer = setTimeout(fakeSyllables, Math.random() < 0.12 ? 280 : 60 + Math.random() * 60);
+      }, 90 + Math.random() * 110);
+    }
+    function startMouth() {
+      if (mouthOn) return;
+      mouthOn = true; mouth.classList.add('talk'); requestAnimationFrame(mouthFrame); fakeSyllables();
+    }
+    function stopMouth() {
+      if (!mouthOn) return;
+      mouthOn = false; clearTimeout(fakeTimer); level = target = 0;
+      mouth.classList.remove('talk'); mouth.style.width = mouth.style.height = '';
+    }
+    function onLevel(v) { levelAt = Date.now(); target = Math.max(0, Math.min(1, Number(v) || 0)); }
+
+    // Browser speech, used only by the old Controls window.
+    function speakText(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US'; utter.rate = 1.02;
+      utter.onstart = () => { ttsSpeaking = true; render(); };
+      utter.onend = () => { ttsSpeaking = false; render(); };
+      window.speechSynthesis.speak(utter);
+    }
+
+    // ---------- state from the server / controls window ----------
     // sticky: the backend drives SPEAKING on/off itself, so skip the 3.8s auto-stop
     function applyRobotState(state, shouldSpeak = false, action = null, sticky = false) {
-      if (action === 'BLINK') {
-        triggerBlink();
-        return;
-      }
-      if (action === 'STOP_SPEECH' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      if (action === 'BLINK') { blinkNow(); return; }
+      if (action === 'STOP_SPEECH' && 'speechSynthesis' in window) { window.speechSynthesis.cancel(); ttsSpeaking = false; }
 
+      const before = currentState;
       currentState = { ...currentState, ...state };
-
       if (state.face_frame) applyFaceFrame(state.face_frame);
 
       const isBlue = currentState.theme === 'BLUE';
       document.body.classList.toggle('theme-blue', isBlue);
-      if (btnToggleTheme) {
-        btnToggleTheme.textContent = isBlue ? 'Color: Blue' : 'Color: Red';
-      }
+      if (btnToggleTheme) btnToggleTheme.textContent = isBlue ? 'Color: Blue' : 'Color: Red';
 
-      // Responsive eye tracking movement
-      const maxOffset = 42;
-      const offsetX = (currentState.eye_x || 0) * maxOffset;
-      const offsetY = (currentState.eye_y || 0) * (maxOffset * 0.45);
+      if ('face_moment' in state) onMoment(state.face_moment);
+      if ('card' in state) onCard(state.card);
+      if (state.user_text && state.user_text !== before.user_text) noteActivity();
+      if (busy()) noteActivity();
 
-      eyesRow.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-      leftPupil.style.transform = `translate(${offsetX * 0.5}px, ${offsetY * 0.5}px)`;
-      rightPupil.style.transform = `translate(${offsetX * 0.5}px, ${offsetY * 0.5}px)`;
-
-      // Expressions
-      leftEye.classList.remove('happy', 'thinking');
-      rightEye.classList.remove('happy', 'thinking');
-      mouth.classList.remove('speaking');
       clearTimeout(speakingTimeout);
-
-      const expr = currentState.expression;
-      if (expr === 'GREET' || expr === 'HAPPY') {
-        leftEye.classList.add('happy');
-        rightEye.classList.add('happy');
-      } else if (expr === 'THINKING') {
-        leftEye.classList.add('thinking');
-        rightEye.classList.add('thinking');
-      } else if (expr === 'SPEAKING') {
-        mouth.classList.add('speaking');
-        if (!sticky) speakingTimeout = setTimeout(() => {
-          mouth.classList.remove('speaking');
-          if (currentState.expression === 'SPEAKING') {
-            currentState.expression = 'IDLE';
-          }
+      if (currentState.expression === 'SPEAKING' && !sticky) {
+        speakingTimeout = setTimeout(() => {
+          if (currentState.expression === 'SPEAKING') { currentState.expression = 'IDLE'; render(); }
         }, 3800);
       }
-
-      if (shouldSpeak && currentState.last_spoken_text) {
-        speakText(currentState.last_spoken_text);
-      }
+      render();
+      if (shouldSpeak && currentState.last_spoken_text) speakText(currentState.last_spoken_text);
     }
 
-    // Listen to Controller Window via BroadcastChannel, postMessage, and localStorage
     function handleSyncPayload(payload) {
       if (!payload || payload.type !== 'CYNO_STATE_UPDATE') return;
       applyRobotState(payload.state || {}, Boolean(payload.speak), payload.action || null);
     }
-
-    if (bc) {
-      bc.onmessage = (ev) => handleSyncPayload(ev.data);
-    }
+    if (bc) bc.onmessage = (ev) => handleSyncPayload(ev.data);
     window.addEventListener('message', (ev) => handleSyncPayload(ev.data));
     window.addEventListener('storage', (ev) => {
-      if (ev.key === STORAGE_KEY && ev.newValue) {
-        try { handleSyncPayload(JSON.parse(ev.newValue)); } catch (e) {}
-      }
+      if (ev.key === STORAGE_KEY && ev.newValue) { try { handleSyncPayload(JSON.parse(ev.newValue)); } catch (e) {} }
     });
-
-    // Load last saved state if available
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.state) {
-          applyRobotState(parsed.state, false);
-        }
-      }
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (saved && saved.state) applyRobotState(saved.state, false);
     } catch (e) {}
+    render();
 
-    // Natural eye blinking every 3.8 seconds
-    setInterval(triggerBlink, 3800);
-
-    // Optional Backend WebSocket Sync
     function connectWS() {
       if (location.protocol === 'file:' || !location.host) return;
       try {
@@ -423,9 +387,8 @@
         ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.state) {
-              applyRobotState(msg.state, Boolean(msg.speak), null, Boolean(msg.sticky));
-            }
+            if (msg.type === 'CYNO_LEVEL') onLevel(msg.v);
+            else if (msg.state) applyRobotState(msg.state, Boolean(msg.speak), null, Boolean(msg.sticky));
           } catch (err) {}
         };
         ws.onclose = () => setTimeout(connectWS, 3000);

@@ -6,5 +6,9 @@
     "left": 16,
     "radius": 36
   },
-  "chest_scene": "auto"
+  "chest_scene": "auto",
+  "face_life": {
+    "calm": false,
+    "sleep_after": 120
+  }
 }

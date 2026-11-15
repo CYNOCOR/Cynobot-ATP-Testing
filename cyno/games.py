@@ -182,6 +182,8 @@ def public_config(online: bool) -> dict:
 
 # What a visitor might say -> which screen to open ("menu" = the games list).
 _VOICE = [
+    # Back to a game that was moved aside to answer a question (the chest opens the menu if none was).
+    ("resume", r"\b((go |get )?back to (the |my |our )?game|continue (the |my |our )?game|resume( the game)?|keep playing|carry on playing|let'?s continue)\b"),
     ("wordchain", r"\bword\s?chain\b"),
     ("degree", r"\b(find (my|your|a) degree|which (degree|course|programme|program) (suits|fits|is (right|best) for)|what should i study)\b"),
     ("riddles", r"\b(riddles?|brain (puzzle|teaser|game)s?)\b"),
@@ -199,7 +201,7 @@ def voice_request(text: str, online: bool = True) -> str | None:
         return None
     text = text.lower()
     for game, pattern in _VOICE:
-        if re.search(pattern, text) and (game == "menu" or game in live):
+        if re.search(pattern, text) and (game in ("menu", "resume") or game in live):
             return game
     return None
 
@@ -217,6 +219,9 @@ asked about games in general, the screen shows all of them: name the games in on
 sentence and invite them to tap one. If they asked for one game, just say it is open on your chest screen. Tap games are played by touch, so do not try to
 run them by voice, and do not read out puzzle answers. If someone seems bored or asks what you
 can do, you may mention the games.
+If a visitor asks you something while a game is open, answer it normally: the screen moves the game
+aside to show your answer, and the game comes back afterwards where they left it. If they ask to go
+back to the game, just say it is back on the screen.
 """
     if "wordchain" in live:
         out += """

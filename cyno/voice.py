@@ -159,6 +159,23 @@ CYNOCOR_SOUNDALIKE = re.compile(
 )
 
 
+# What the visitor said that deserves a face moment on the head screen.
+THANKS = re.compile(
+    r"\b(thank(s| you)|thx|cheers|you('?re| are) (so |very |really )?(cute|sweet|awesome|amazing|great|smart|cool|helpful|the best)"
+    r"|(so|very|really) (cute|sweet|helpful)|love you|good (job|robot|bot)|well done|nice (job|work))\b",
+    re.IGNORECASE,
+)
+GOODBYE = re.compile(r"\b(good ?bye|bye( bye)?(?![ -]?laws?)|see (you|ya)|have a (good|nice|great) (day|one)|take care|cya)\b", re.IGNORECASE)
+
+
+def face_moment(text: str) -> str | None:
+    if GOODBYE.search(text):
+        return "wink"
+    if THANKS.search(text):
+        return "love"
+    return None
+
+
 class DisplayObserver(BaseObserver):
     """Turns pipeline frames into face/chest display state."""
 
@@ -215,7 +232,14 @@ class DisplayObserver(BaseObserver):
                 self._user_text = ""
                 self._card_id = None
                 self._new_user_turn = False
+                self._moment_done = False
             self._user_text = f"{self._user_text} {frame.text}".strip()
+            # Hearts for thanks or a compliment, a wink for goodbye (once per question).
+            if not getattr(self, "_moment_done", False):
+                moment = face_moment(self._user_text)
+                if moment:
+                    self._moment_done = True
+                    await self._bus.moment(moment)
             self._new_bot_turn = True
             # A new question clears the old card; the next one is chosen from Cynobot's answer.
             changes = {"expression": "THINKING", "flow_step": "CONVERSE", "user_text": self._user_text, "card": None}

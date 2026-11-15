@@ -389,6 +389,23 @@ class Api:
             return {"ok": False, "error": str(e)}
         return {"ok": True, "live": False}
 
+    # ---------- face life (head screen) ----------
+
+    def get_face_life(self):
+        from cyno import display
+
+        live = self._get(f"{self._base()}/api/face-life")
+        return live if isinstance(live, dict) and "calm" in live else display.load_life()
+
+    def set_face_life(self, life: dict):
+        from cyno import display
+
+        r = self._notify("/api/face-life", life)
+        if r is not None and r.status_code == 200:
+            return {"ok": True, "live": True}
+        display.save_life({**display.load_life(), **life})
+        return {"ok": True, "live": False}
+
     # ---------- locked chest screen ----------
 
     def kiosk_status(self):
