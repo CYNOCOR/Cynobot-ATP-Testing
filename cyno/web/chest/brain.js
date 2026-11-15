@@ -28,7 +28,9 @@
 
   function build(density) {
     const n = DENSITY[density] || DENSITY.full, rand = seeded(31415), nodes = [];
-    const add = (x, y, z) => nodes.push({ x, y, z, fire: -10 });
+    // dx, dy, dz: the way this neuron drifts when the brain dissolves into mist
+    const add = (x, y, z) => { const a = rand() * 6.283, b = rand() * 2 - 1, q = Math.sqrt(1 - b * b), s = 0.6 + rand() * 0.9;
+      nodes.push({ x, y, z, fire: -10, dx: Math.cos(a) * q * s, dy: b * s * 0.7, dz: Math.sin(a) * q * s }); };
     // cerebrum: neurons on a folded cortex (two hemispheres with a gap), fuller at the front,
     // flatter underneath; a few inside
     while (nodes.length < n.cortex) {
@@ -66,6 +68,9 @@
     let W = 0, H = 0, dpr = 1, frameCy = null, frameH = null;
     let net = build(opts.density || 'full'), density = opts.density || 'full';
     let signals = [], queue = [], waves = [], nextSpont = 0, nextWave = 4;
+    // idle: calm. think: Cynobot is connecting or working out an answer, so it fires faster and busier.
+    let mode = 'idle';
+    const PACE = { idle: { spont: [0.12, 0.3], travel: 1, wave: [9, 6], rest: 2.2 }, think: { spont: [0.02, 0.06], travel: 0.5, wave: [2.5, 2], rest: 1.1 } };
     const rand = seeded(2718);
     let C = {};
     function colours() {
@@ -93,32 +98,38 @@
     // Spikes travel slowly (about 0.6-1 s per link) so each one can be followed by eye.
     function fire(i, t) {
       const p = net.nodes[i];
-      if (!p || t - p.fire < 2.2) return;   // resting after the last spike
+      if (!p || t - p.fire < PACE[mode].rest) return;   // resting after the last spike
       p.fire = t;
       for (const k of net.nbr[i]) {
-        if (rand() < 0.3) { const l = net.links[k], to = l.a === i ? l.b : l.a; queue.push({ from: i, to, t0: t, dur: 0.4 + l.len * 7 }); }
+        if (rand() < 0.3) { const l = net.links[k], to = l.a === i ? l.b : l.a; queue.push({ from: i, to, t0: t, dur: (0.4 + l.len * 7) * PACE[mode].travel }); }
       }
     }
 
     function draw(t) {
+      const dt = Math.min(0.05, t - (lastT || t)); lastT = t;
+      vis += Math.sign(target - vis) * Math.min(Math.abs(target - vis), dt / 1.1);
+      const e = vis * vis * (3 - 2 * vis), spread = 1 - e;   // eased; spread = how far it has come apart
       if (queue.length) { signals.push(...queue); queue = []; }
       const m = Math.min(W, H);
       // sit in the free space above the words (set by the page), else a little above centre
       const cy = frameCy != null ? frameCy * dpr : H * 0.38;
       const sc = frameH != null ? Math.min(m * 1.15, frameH * dpr * 1.9) : m * 1.15;
       const cx = W * 0.5, yaw = Math.sin(t * 0.2) * 0.45, pitch = 0.1 + Math.sin(t * 0.17) * 0.06;   // mostly a side view
-      const P = net.nodes.map((p) => project(p, yaw, pitch, sc, cx, cy, t));
-      if (t > nextSpont) { fire(Math.floor(rand() * net.nodes.length), t); nextSpont = t + 0.12 + rand() * 0.3; }
+      // dissolving: neurons drift apart (and the whole brain swells a little) as it fades
+      const P = net.nodes.map((p) => project({ x: p.x * (1 + spread * 0.25) + p.dx * spread * 0.32, y: p.y * (1 + spread * 0.25) + p.dy * spread * 0.32,
+        z: p.z + p.dz * spread * 0.32 }, yaw, pitch, sc, cx, cy, t));
+      if (t > nextSpont) { fire(Math.floor(rand() * net.nodes.length), t); nextSpont = t + PACE[mode].spont[0] + rand() * PACE[mode].spont[1]; }
       if (t > nextWave) {   // a bigger wave spreading out from one region of the cortex
         const c = net.nodes[Math.floor(rand() * net.cortex)];
         net.nodes.forEach((p, i) => { const d = Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z); if (d < 0.12) waves.push({ i, t: t + d * 6 }); });
-        nextWave = t + 9 + rand() * 6;
+        nextWave = t + PACE[mode].wave[0] + rand() * PACE[mode].wave[1];
       }
       waves = waves.filter((w) => { if (t < w.t) return true; fire(w.i, t); return false; });
 
       ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = Math.min(1, e * 1.15);
       ctx.lineWidth = 0.8 * dpr;
-      ctx.strokeStyle = rgba(C.acc, 0.13);
+      ctx.strokeStyle = rgba(C.acc, 0.13 * e * e);   // links let go first
       ctx.beginPath();
       for (const l of net.links) { const A = P[l.a], B = P[l.b]; ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); }
       ctx.stroke();
@@ -127,8 +138,9 @@
         if (u >= 1) { fire(s.to, t); return false; }
         const A = P[s.from], B = P[s.to], x = A.x + (B.x - A.x) * u, y = A.y + (B.y - A.y) * u, u0 = Math.max(0, u - 0.35);
         ctx.beginPath(); ctx.moveTo(A.x + (B.x - A.x) * u0, A.y + (B.y - A.y) * u0); ctx.lineTo(x, y);
-        ctx.lineWidth = 1.8 * dpr; ctx.strokeStyle = rgba(C.acc, 0.85); ctx.stroke();
-        dot(x, y, 1.8 * dpr * A.k, rgba(C.shine, 1));
+        // signals fade with the links, so they never stretch across the screen while it comes apart
+        ctx.lineWidth = 1.8 * dpr; ctx.strokeStyle = rgba(C.acc, 0.85 * e * e * e); ctx.stroke();
+        dot(x, y, 1.8 * dpr * A.k, rgba(C.shine, e * e));
         return true;
       });
       const order = P.map((p, i) => i).sort((a, b) => P[a].z - P[b].z);
@@ -137,9 +149,13 @@
         if (f > 0.04) glow(p.x, p.y, (10 + f * 18) * dpr * p.k, C.acc, 0.55 * f);
         dot(p.x, p.y, (1.3 + f * 2.2) * dpr * p.k, f > 0.04 ? rgba(C.shine, 0.5 + f * 0.5) : rgba(C.grey, 0.45 * depth));
       }
+      ctx.globalAlpha = 1;
+      if (vis <= 0 && target === 0) { running = false; ctx.clearRect(0, 0, W, H); }   // fully dissolved: stop drawing
     }
 
-    let raf = 0, running = false, shown = false, stopTimer = 0, frames = 0, fps = 0, fpsAt = performance.now();
+    let raf = 0, running = false, shown = false, frames = 0, fps = 0, fpsAt = performance.now(), lastT = 0;
+    // vis: 0 = dissolved into mist, 1 = a whole brain. It eases toward the target over about 1.1 s.
+    let vis = 0, target = 0;
     function loop(now) {
       if (!running) return;
       if (!document.hidden) {
@@ -150,16 +166,16 @@
       raf = requestAnimationFrame(loop);
     }
     return {
-      /** Fade in (true) or out (false); it stops drawing once it has faded out. */
+      /** Gather into a brain (true) or dissolve into mist (false); it stops drawing once dissolved. */
       show(on) {
         on = Boolean(on);
         if (on === shown) return;
-        shown = on;
+        shown = on; target = on ? 1 : 0;
         canvas.classList.toggle('on', on);
-        clearTimeout(stopTimer);
-        if (on && !running) { running = true; resize(); raf = requestAnimationFrame(loop); }
-        if (!on) stopTimer = setTimeout(() => { running = false; cancelAnimationFrame(raf); ctx.clearRect(0, 0, W, H); }, 1000);
+        if (!running) { running = true; lastT = 0; resize(); raf = requestAnimationFrame(loop); }
       },
+      /** 'idle' (calm) or 'think' (busy, while Cynobot connects or works out an answer). */
+      setMode(m) { if (PACE[m] && m !== mode) { mode = m; nextSpont = 0; nextWave = Math.min(nextWave, performance.now() / 1000 + 0.3); } },
       /** Where the brain sits: the centre of the free space and its height (CSS pixels). */
       setFrame(centreY, height) { frameCy = centreY; frameH = height; },
       /** 'full' (about 500 neurons) or 'light' (about 300). */
