@@ -73,13 +73,16 @@ def save_scene(value: str) -> str:
 # ---- face life (head screen): how lively the face is ----
 # calm: no glances, breathing or hops, and steadier blinks. sleep_after: seconds with no
 # conversation before the face dozes off (0 = never).
-DEFAULT_LIFE = {"calm": False, "sleep_after": 120}
+EYE_STYLES = ("rings", "pills")  # Sparkle rings, or the tall rounded Pill eyes
+DEFAULT_LIFE = {"calm": False, "sleep_after": 120, "eyes": "rings"}
 
 
 def _clean_life(life: dict) -> dict:
     out = dict(DEFAULT_LIFE)
     if "calm" in life:
         out["calm"] = bool(life["calm"])
+    if life.get("eyes") in EYE_STYLES:
+        out["eyes"] = life["eyes"]
     try:
         out["sleep_after"] = max(0, min(3600, int(life.get("sleep_after", out["sleep_after"]))))
     except (TypeError, ValueError):

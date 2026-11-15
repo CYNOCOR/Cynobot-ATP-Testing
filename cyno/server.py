@@ -210,7 +210,7 @@ async def get_games():
 async def post_game_score(body: dict):
     try:
         result = games.submit_score(str(body.get("game")), str(body.get("level", "")), body.get("score", 0))
-        await bus.moment("surprised")  # a game finished: the face celebrates
+        await bus.moment("love" if result.get("is_best") else "surprised")  # hearts for a new best today
         return result
     except (ValueError, TypeError) as e:
         return Response(str(e), status_code=400)

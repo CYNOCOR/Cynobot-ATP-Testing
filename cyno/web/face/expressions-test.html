@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Face Expressions Test</title>
+  <!-- Test page for the head screen's expressions: drives the face in the frame below with a
+       button per expression. It only talks to that frame, so it changes nothing on the robot.
+       Open http://localhost:7860/face/expressions-test.html while Cyno is running. -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0c0c0e; color: #eee; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 16px; }
+    .bar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 12px; }
+    .bar h1 { font-size: 16px; font-weight: 600; margin-right: auto; }
+    .lbl { color: #888; margin-right: 6px; }
+    .seg { display: inline-flex; border: 1px solid #333; border-radius: 999px; overflow: hidden; }
+    .seg button { appearance: none; border: 0; background: transparent; color: #bbb; font: inherit; padding: 7px 13px; cursor: pointer; }
+    .seg button.on { background: #f2f2f2; color: #111; }
+    .frame { position: relative; width: min(100%, 900px); aspect-ratio: 16 / 10; overflow: hidden; border-radius: 10px; border: 1px solid #2a2a2a; background: #000; }
+    .frame iframe { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; border: 0; transform-origin: 0 0; }
+    .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+    .group { border: 1px solid #262626; border-radius: 10px; padding: 12px; }
+    .group h2 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btns button { appearance: none; border: 1px solid #333; border-radius: 999px; background: #161616; color: #ddd; font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer; }
+    .btns button:hover { border-color: #777; }
+    .now { margin-top: 10px; color: #aaa; min-height: 18px; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <h1>Face expressions test</h1>
+    <span><span class="lbl">Eyes</span><span class="seg" id="segEyes"><button data-v="rings" class="on">Sparkle rings</button><button data-v="pills">Pills</button></span></span>
+    <span><span class="lbl">Colour</span><span class="seg" id="segTheme"><button data-v="RED" class="on">Red</button><button data-v="BLUE">Blue</button></span></span>
+    <span><span class="lbl">Movement</span><span class="seg" id="segCalm"><button data-v="lively" class="on">Lively</button><button data-v="calm">Calm</button></span></span>
+  </div>
+  <div class="frame"><iframe id="face" src="index.html"></iframe></div>
+  <div class="groups">
+    <div class="group"><h2>Everyday (from the conversation)</h2><div class="btns">
+      <button data-s='{"voice_status":"OFFLINE","expression":"IDLE"}'>Idle</button>
+      <button data-s='{"voice_status":"LIVE","expression":"IDLE"}'>Listening</button>
+      <button data-s='{"voice_status":"LIVE","expression":"THINKING"}'>Thinking</button>
+      <button data-s='{"voice_status":"LIVE","expression":"SPEAKING"}'>Speaking</button>
+      <button data-s='{"voice_status":"LIVE","expression":"GREET"}'>Greeting (happy)</button>
+      <button data-s='{"voice_status":"LIVE","expression":"IDLE","game_playing":true}'>Watching a game</button>
+      <button data-s='{"voice_status":"OFFLINE","expression":"IDLE","game_playing":false,"face_life":{"sleep_after":2}}'>Fall asleep (2 s)</button>
+      <button data-s='{"voice_status":"CONNECTING","face_life":{"sleep_after":120}}'>Wake up</button>
+    </div></div>
+    <div class="group"><h2>Moments (what triggers them)</h2><div class="btns">
+      <button data-m="love">Thank you → hearts</button>
+      <button data-m="shy">Compliment → shy</button>
+      <button data-m="laugh">“Haha” → laugh</button>
+      <button data-m="sparkle">“Wow” → sparkle</button>
+      <button data-m="thumbs">“Good job” → thumbs up</button>
+      <button data-m="wink">Goodbye → wink</button>
+      <button data-m="surprised">Game finished → surprised</button>
+      <button data-m="dizzy">Cyno Run crash → dizzy</button>
+      <button data-m="confused">“I'm not sure” → confused</button>
+      <button data-m="awkward">“I can't help with that” → awkward</button>
+      <button data-m="sad">“I'm stressed” → sad</button>
+      <button data-m="grumpy">Rude word → grumpy</button>
+    </div></div>
+    <div class="group"><h2>Try it</h2><div class="btns">
+      <button data-m="love" data-speak="1">Hearts while talking</button>
+      <button id="btnTour">Play every expression</button>
+    </div></div>
+  </div>
+  <div class="now" id="now"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const frame = $('#face');
+let life = { calm: false, sleep_after: 120, eyes: 'rings' };
+function send(state) {
+  frame.contentWindow.postMessage({ type: 'CYNO_STATE_UPDATE', state, speak: false, action: null, ts: Date.now() }, '*');
+}
+function sendState(s) {
+  if (s.face_life) { life = { ...life, ...s.face_life }; s = { ...s, face_life: life }; }
+  send(s);
+}
+function moment(name) { send({ face_moment: { name, id: Date.now() } }); $('#now').textContent = name; }
+document.querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => { sendState(JSON.parse(b.dataset.s)); $('#now').textContent = b.textContent; }));
+document.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => {
+  if (b.dataset.speak) send({ voice_status: 'LIVE', expression: 'SPEAKING' });
+  moment(b.dataset.m);
+}));
+function seg(id, fn) { $(id).addEventListener('click', (e) => { const v = e.target.dataset.v; if (!v) return; [...$(id).children].forEach((x) => x.classList.toggle('on', x === e.target)); fn(v); }); }
+seg('#segEyes', (v) => sendState({ face_life: { eyes: v } }));
+seg('#segTheme', (v) => send({ theme: v }));
+seg('#segCalm', (v) => sendState({ face_life: { calm: v === 'calm' } }));
+$('#btnTour').addEventListener('click', () => {
+  const steps = ['love', 'shy', 'laugh', 'sparkle', 'thumbs', 'wink', 'surprised', 'dizzy', 'confused', 'awkward', 'sad', 'grumpy'];
+  sendState({ voice_status: 'LIVE', expression: 'IDLE' });
+  steps.forEach((m, i) => setTimeout(() => moment(m), 400 + i * 3000));
+});
+function fit() { frame.style.transform = `scale(${frame.parentElement.clientWidth / 1280})`; }
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

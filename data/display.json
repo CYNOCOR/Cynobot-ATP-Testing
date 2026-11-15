@@ -9,6 +9,7 @@
   "chest_scene": "auto",
   "face_life": {
     "calm": false,
-    "sleep_after": 120
+    "sleep_after": 120,
+    "eyes": "rings"
   }
 }

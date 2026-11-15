@@ -32,12 +32,15 @@
     <button data-state="think">Thinking</button>
     <button data-state="answer">Answering</button>
     <button data-state="games">Games</button>
+    <button data-idle="globe" class="on">Idle A: Globe</button>
+    <button data-idle="aurora">Idle B: Aurora</button>
+    <button data-idle="stars">Idle C: Constellation</button>
     <button id="burst">Celebrate</button>
     <button id="theme">Colour: Red</button>
     <label>Voice <input type="range" id="level" min="0" max="100" value="0" /></label>
     <label><input type="checkbox" id="talk" checked /> Pretend someone is talking</label>
   </div>
-  <script src="particles.js?v=13"></script>
+  <script src="particles.js?v=15"></script>
   <script>
     const stage = CynoParticles.create(document.getElementById('stage'));
     if (!stage) document.getElementById('none').style.display = 'flex';
@@ -49,6 +52,11 @@
       document.querySelectorAll('[data-state]').forEach((b) => b.classList.toggle('on', b.dataset.state === s));
     }
     document.querySelectorAll('[data-state]').forEach((b) => b.addEventListener('click', () => show(b.dataset.state)));
+    document.querySelectorAll('[data-idle]').forEach((b) => b.addEventListener('click', () => {
+      if (stage) stage.setIdle(b.dataset.idle);
+      document.querySelectorAll('[data-idle]').forEach((x) => x.classList.toggle('on', x === b));
+      show('idle');
+    }));
     document.getElementById('burst').onclick = () => stage && stage.burst();
     document.getElementById('theme').onclick = (e) => { theme = theme === 'RED' ? 'BLUE' : 'RED'; stage && stage.setTheme(theme); e.target.textContent = 'Colour: ' + (theme === 'RED' ? 'Red' : 'Blue'); };
     // Stand-in for a real voice: speech-like bursts while listening or answering.

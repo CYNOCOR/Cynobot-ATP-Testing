@@ -28,6 +28,7 @@ GAMES = {
     "memory": ("Memory Match", "Flip the cards and find every pair.", False),
     "puzzle": ("Picture Puzzle", "Put the broken picture back together.", False),
     "degree": ("Find Your Degree", "Answer a few questions and meet your IIT match.", False),
+    "runner": ("Cyno Run", "Roll, jump and duck past obstacles. How far can you go?", False),
     "wordchain": ("Word Chain", "Play by voice: each word starts with the last letter.", True),
 }
 # Lower is better for these (moves or seconds); higher is better for the rest.
@@ -38,6 +39,7 @@ DEFAULT_SETTINGS = {
     "games": {g: True for g in GAMES},
     "time_limit_secs": 120,  # one game, then back to receptionist mode
     "idle_secs": 30,  # no touch for this long closes a tap game
+    "sound": True,  # little game sound effects (Cyno Run); Cynobot's voice is not affected
 }
 
 
@@ -53,6 +55,7 @@ def load_settings() -> dict:
     out = {
         "enabled": bool(data.get("enabled", DEFAULT_SETTINGS["enabled"])),
         "games": {g: bool((data.get("games") or {}).get(g, True)) for g in GAMES},
+        "sound": bool(data.get("sound", DEFAULT_SETTINGS["sound"])),
     }
     for key, lo, hi in (("time_limit_secs", 30, 900), ("idle_secs", 10, 300)):
         try:
@@ -66,6 +69,8 @@ def save_settings(changes: dict) -> dict:
     current = load_settings()
     if "enabled" in changes:
         current["enabled"] = bool(changes["enabled"])
+    if "sound" in changes:
+        current["sound"] = bool(changes["sound"])
     for g, on in (changes.get("games") or {}).items():
         if g in GAMES:
             current["games"][g] = bool(on)
@@ -168,6 +173,7 @@ def public_config(online: bool) -> dict:
         "games": [{"id": g, "title": GAMES[g][0], "about": GAMES[g][1], "voice": GAMES[g][2]} for g in live],
         "time_limit_secs": cfg["time_limit_secs"],
         "idle_secs": cfg["idle_secs"],
+        "sound": cfg["sound"],
         "riddles": data.get("riddles", []),
         "degree": data.get("degree", {}),
         "puzzle_images": puzzle_images(),
@@ -189,6 +195,8 @@ _VOICE = [
     ("riddles", r"\b(riddles?|brain (puzzle|teaser|game)s?)\b"),
     ("memory", r"\bmemory (match|game|cards?)\b"),
     ("puzzle", r"\b(picture|jigsaw) puzzle\b"),
+    # "Cyno" is often heard as Sino, Psycho, Cyber or Signo.
+    ("runner", r"\b((cyno|sino|psycho|cyber|signo|sign o|saino) ?run(ner)?|robot (run|dash|runner|race)|running game|runner game|dino(saur)? game|jump(ing)? game)\b"),
     # Any question about games shows the page with all of them.
     ("menu", r"\bgames\b|\bpuzzles\b|\b(play|open|show|start|have|any|about|want|a|the|another)\b.{0,25}\bgame\b(?! plan)|\bgame (menu|please|time)\b|\bplay (something|with (me|you))\b"),
 ]

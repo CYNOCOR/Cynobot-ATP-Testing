@@ -160,19 +160,40 @@ CYNOCOR_SOUNDALIKE = re.compile(
 
 
 # What the visitor said that deserves a face moment on the head screen.
-THANKS = re.compile(
-    r"\b(thank(s| you)|thx|cheers|you('?re| are) (so |very |really )?(cute|sweet|awesome|amazing|great|smart|cool|helpful|the best)"
-    r"|(so|very|really) (cute|sweet|helpful)|love you|good (job|robot|bot)|well done|nice (job|work))\b",
-    re.IGNORECASE,
-)
-GOODBYE = re.compile(r"\b(good ?bye|bye( bye)?(?![ -]?laws?)|see (you|ya)|have a (good|nice|great) (day|one)|take care|cya)\b", re.IGNORECASE)
+# What the visitor said that deserves a face moment on the head screen (checked in this order).
+_I = re.IGNORECASE
+GOODBYE = re.compile(r"\b(good ?bye|bye( bye)?(?![ -]?laws?)|see (you|ya)|have a (good|nice|great) (day|one)|take care|cya)\b", _I)
+RUDE = re.compile(r"\b(stupid|dumb|idiot|useless|shut up|i hate you|you suck|annoying|boring robot)\b", _I)
+SAD = re.compile(
+    r"\b(i('?m| am) (so |really |very |feeling )?(sad|tired|stressed|upset|lonely|nervous|worried|scared|anxious)"
+    r"|i failed|i lost|bad day|feel(ing)? (bad|down|sad|sick))\b", _I)
+THUMBS = re.compile(r"\b(good (job|robot|bot)|well done|nice (job|work)|great (job|work)|you did (it|great|well))\b", _I)
+COMPLIMENT = re.compile(
+    r"\b(you('?re| are) (so |very |really |too )?(cute|sweet|adorable|smart|clever|beautiful|pretty|handsome|cool|awesome|amazing|the best|lovely)"
+    r"|(so|very|really) (cute|sweet|adorable)|love you|i like you)\b", _I)
+THANKS = re.compile(r"\b(thank(s| you)|thx|cheers|appreciate it)\b", _I)
+LAUGH = re.compile(r"\b(ha(ha)+|he(he)+|lol|lmao|that'?s (so |really )?funny|hilarious|good one)\b", _I)
+WOW = re.compile(r"\b(wow+|whoa|amazing|awesome|incredible|so cool|that'?s cool|no way)\b", _I)
+# What Cynobot itself said: not sure (confused), or can't help (awkward).
+NOT_SURE = re.compile(r"\b(i'?m not sure|i don'?t know|i do not know|check with the front desk|i didn'?t (catch|hear|understand))", _I)
+CANT_HELP = re.compile(r"\b(i can'?t (help|talk|answer|discuss)|i'?d rather not|i'?m not able to|that'?s not something i|i can only help)", _I)
 
 
 def face_moment(text: str) -> str | None:
-    if GOODBYE.search(text):
-        return "wink"
-    if THANKS.search(text):
-        return "love"
+    text = " ".join(text.split())  # transcripts can arrive with doubled spaces
+    for pattern, name in ((GOODBYE, "wink"), (RUDE, "grumpy"), (SAD, "sad"), (THUMBS, "thumbs"),
+                          (COMPLIMENT, "shy"), (THANKS, "love"), (LAUGH, "laugh"), (WOW, "sparkle")):
+        if pattern.search(text):
+            return name
+    return None
+
+
+def bot_moment(text: str) -> str | None:
+    text = " ".join(text.split())
+    if CANT_HELP.search(text):
+        return "awkward"
+    if NOT_SURE.search(text):
+        return "confused"
     return None
 
 
@@ -256,9 +277,16 @@ class DisplayObserver(BaseObserver):
                 self._bot_text = ""
                 self._card_id, self._card_score = None, 0.0
                 self._new_bot_turn = False
+                self._bot_moment_done = False
             sep = "" if getattr(frame, "includes_inter_frame_spaces", False) or not self._bot_text else " "
             self._bot_text += sep + frame.text
             changes = {"last_spoken_text": self._bot_text.strip()}
+            # Cynobot says it isn't sure (confused face) or can't help (awkward face), once per answer.
+            if not getattr(self, "_bot_moment_done", False):
+                moment = bot_moment(self._bot_text)
+                if moment:
+                    self._bot_moment_done = True
+                    await self._bus.moment(moment)
             card = self._choose_card()
             if card is not False:
                 changes["card"] = card

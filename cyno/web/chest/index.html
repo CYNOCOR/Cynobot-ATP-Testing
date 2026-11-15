@@ -25,7 +25,11 @@
     html { background: var(--cy-bg3); }
     /* The same glow as the face screen's visor. */
     body { background: radial-gradient(ellipse 85% 75% at 50% 40%, var(--cy-bg1) 0%, var(--cy-bg2) 62%, var(--cy-bg3) 100%); }
-    #stage { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    #stage { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; transition: opacity 0.9s ease; }
+    /* Idle: a 3D brain of firing neurons (brain.js) takes over from the particles, cross-fading. */
+    #brain { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 0.9s ease; }
+    #brain.on { opacity: 1; }
+    body.brain-idle #stage { opacity: 0; }
     .hidden { display: none !important; }
     /* Plain background: used when 3D is switched off in Cyno Control, or the browser has none.
        Two soft lights in the face colour that drift slowly; costs almost nothing to draw. */
@@ -153,10 +157,11 @@
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
   </style>
-  <link rel="stylesheet" href="games2.css?v=4" />
+  <link rel="stylesheet" href="games2.css?v=5" />
 </head>
 <body>
   <canvas id="stage"></canvas>
+  <canvas id="brain" aria-hidden="true"></canvas>
   <div class="shell">
     <header class="topbar">
       <span class="brand">CYNOBOT</span>
@@ -205,7 +210,8 @@
   <audio id="botAudio" autoplay></audio>
   <div class="games hidden" id="games"></div>
 
-  <script src="particles.js?v=13"></script>
+  <script src="particles.js?v=15"></script>
+  <script src="brain.js?v=2"></script>
   <script src="devices.js?v=1"></script>
   <script>
     const $ = (id) => document.getElementById(id);
@@ -215,23 +221,45 @@
     const goPlain = () => document.body.classList.add('plain');
     try { stage = window.CynoParticles ? CynoParticles.create($('stage'), { onLost: goPlain }) : null; } catch (e) { stage = null; }
     if (!stage) goPlain();
+    // The idle brain (2D, so it works even without 3D graphics).
+    let brain = null;
+    try { brain = window.CynoBrain ? CynoBrain.create($('brain')) : null; } catch (e) { brain = null; }
+    let gameOn = false, brainIdle = false, settleTimer = 0;
+    // The particles stop drawing while the brain has the screen, during Cyno Run, or when switched off.
+    function refreshStagePause() { if (stage) stage.pause(sceneSetting === 'off' || gameOn || (brainIdle && document.body.dataset.brainSettled === '1')); }
+    function setBrainIdle(on) {
+      const want = Boolean(on && brain && sceneSetting !== 'off');
+      if (want === brainIdle) return;
+      brainIdle = want;
+      brain && brain.show(want);
+      document.body.classList.toggle('brain-idle', want);
+      clearTimeout(settleTimer);
+      document.body.dataset.brainSettled = '0';
+      if (want) settleTimer = setTimeout(() => { document.body.dataset.brainSettled = '1'; refreshStagePause(); }, 1000);
+      refreshStagePause();
+    }
 
     // How much 3D to draw: set in Cyno Control (Controls > Displays > Chest background).
     let sceneSetting = '';
     function applySceneSetting(value) {
-      if (!stage || !value || value === sceneSetting) return;
+      if (!value || value === sceneSetting) return;
       sceneSetting = value;
-      document.body.classList.toggle('plain', value === 'off');
-      stage.pause(value === 'off');
-      if (value === 'full') stage.setQuality(3);
-      else if (value === 'light') stage.setQuality(0);
-      else if (value === 'auto') stage.setAuto(2);
+      document.body.classList.toggle('plain', value === 'off' || !stage);
+      if (brain) brain.setDensity(value === 'light' ? 'light' : 'full');
+      if (stage) {
+        if (value === 'full') stage.setQuality(3);
+        else if (value === 'light') stage.setQuality(0);
+        else if (value === 'auto') stage.setAuto(2);
+      }
+      refreshStagePause();
+      syncScene();
     }
     // Tell Cyno Control how fast this screen is really drawing, so the team can judge the setting.
     setInterval(() => {
       if (document.hidden) return;
       const st = stage ? stage.stats() : {};
-      const body = sceneSetting === 'off' || !stage ? { scene: stage ? 'off' : 'none' } : { scene: sceneSetting || 'auto', fps: st.fps, particles: st.particles, quality: st.quality, renderer: st.renderer };
+      let body = sceneSetting === 'off' || !stage ? { scene: stage ? 'off' : 'none' } : { scene: sceneSetting || 'auto', fps: st.fps, particles: st.particles, quality: st.quality, renderer: st.renderer };
+      if (brainIdle && brain) { const b = brain.stats(); body = { ...body, scene: sceneSetting || 'auto', fps: b.fps, particles: b.neurons }; }  // the idle brain is what's drawing
       fetch('/api/chest-stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
     }, 5000);
     let pc = null, micStream = null;
@@ -361,7 +389,6 @@
 
     // ---- What the particles show ----
     function syncScene() {
-      if (!stage) return;
       const live = (state.voice_status || 'OFFLINE') === 'LIVE';
       const gamesOpen = !$('games').classList.contains('hidden');
       if (!gamesOpen && Date.now() < topicUntil) return;  // a topic drawing is on screen
@@ -371,6 +398,8 @@
         : live ? 'listen'
         : wantVoice ? 'think'  // connecting
         : tapped ? 'answer' : 'idle';
+      setBrainIdle(scene === 'idle');
+      if (!stage) return;
       stage.setState(scene);
       stage.setTheme(state.theme === 'BLUE' ? 'BLUE' : 'RED');
     }
@@ -383,8 +412,9 @@
       return { top, bottom: Math.max(top + 80, bottom) };
     }
     function frameStage() {
-      if (!stage) return;
       const { top, bottom } = freeArea(), free = bottom - top - 24;
+      if (brain) brain.setFrame(top + 12 + free / 2, free);
+      if (!stage) return;
       stage.setFrame((top + 12 + free / 2) / window.innerHeight, free / window.innerHeight);
     }
     function placeCard() {
@@ -550,9 +580,14 @@
     $('btnStart').addEventListener('click', () => { wantVoice = true; render(state); startVoice(); });
     $('btnEnd').addEventListener('click', () => { wantVoice = false; closeLink(); render(state); });
     // For the games add-on: start a conversation (Word Chain is played by voice).
-    window.CynoChest = { startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; render(state); startVoice(); } } };
+    window.CynoChest = {
+      startVoice: () => { if (!pc && !wantVoice) { wantVoice = true; render(state); startVoice(); } },
+      // Cyno Run draws its own scene, so the particle background rests while it runs.
+      gameRunning: (on) => { gameOn = Boolean(on); refreshStagePause(); },
+    };
   </script>
-  <script src="games.js?v=4"></script>
+  <script src="runner.js?v=3"></script>
+  <script src="games.js?v=6"></script>
   <script src="kiosk.js?v=2"></script>
 </body>
 </html>

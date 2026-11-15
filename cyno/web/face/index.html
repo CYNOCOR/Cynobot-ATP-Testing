@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cyno Bot — Face Display</title>
-  <!-- The head screen. Big sparkly eyes, blush, natural blinks and glances (step 1), short
-       moments for thanks / a game won / goodbye / a card / dozing off (step 2), and a mouth that
-       follows Cynobot's voice, sent by the chest page as it plays (step 3).
+  <!-- The head screen. Two eye styles (Sparkle rings or Pills, set in Cyno Control) with natural
+       blinks and glances, a mouth that follows Cynobot's voice (sent by the chest page as it plays),
+       and expressions drawn as glowing shapes: hearts, stars, ^ ^, > <, spirals, a "?", sweat drops,
+       a thumbs-up and more, each swapped in with a quick blink.
        Colours come from /shared/theme.css (shared with the chest screen). -->
   <link rel="stylesheet" href="/shared/theme.css?v=1" />
   <style>
@@ -30,8 +31,28 @@
       border-radius: var(--frame-radius, 36px);
       background: radial-gradient(ellipse at center, var(--cy-bg1) 0%, var(--cy-bg2) 70%, var(--cy-bg3) 100%);
       border: 3.5px solid rgba(var(--rgb), 0.82);
-      box-shadow: 0 0 20px rgba(var(--rgb), 0.75), 0 0 48px rgba(var(--rgb), 0.32), inset 0 0 30px rgba(var(--rgb), 0.32);
-      transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
+      /* --lv: Cynobot's voice level, so the frame glows a little brighter as it talks. */
+      box-shadow: 0 0 calc(20px + var(--lv, 0) * 26px) rgba(var(--rgb), 0.75), 0 0 calc(48px + var(--lv, 0) * 40px) rgba(var(--rgb), 0.32),
+        inset 0 0 calc(30px + var(--lv, 0) * 30px) rgba(var(--rgb), 0.32);
+      transition: background 0.3s ease, border-color 0.3s ease; }
+    /* A moment makes the frame flash. */
+    .face-visor.flash { animation: flash 0.7s ease-out; }
+    @keyframes flash { 25% { filter: brightness(1.45) saturate(1.2); } }
+    /* Little bursts (hearts, stars, confetti, a tear...) in the theme colour, like the chest's particles. */
+    #fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
+    .fx { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+    .fx.dot { width: calc(12 * var(--u)); height: calc(12 * var(--u)); margin: calc(-6 * var(--u)); border-radius: 50%; background: var(--primary);
+      box-shadow: 0 0 calc(12 * var(--u)) rgba(var(--rgb), 0.95); }
+    .fx.dot.shine { background: rgb(var(--shine)); box-shadow: 0 0 calc(12 * var(--u)) rgba(var(--shine), 0.95); }
+    .fx svg { display: block; filter: drop-shadow(0 0 calc(8 * var(--u)) rgba(var(--rgb), 0.95)); }
+    .fx svg path { fill: var(--primary); }
+    .fx.word { color: var(--primary); font: 800 calc(46 * var(--u))/1 var(--cy-font); text-shadow: 0 0 calc(12 * var(--u)) rgba(var(--rgb), 0.95); margin: calc(-23 * var(--u)) 0 0 calc(-30 * var(--u)); }
+    .fx.tear { width: calc(22 * var(--u)); height: calc(30 * var(--u)); margin-left: calc(-11 * var(--u)); background: rgb(var(--shine));
+      border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; box-shadow: 0 0 calc(14 * var(--u)) rgba(var(--shine), 0.9); }
+    .fx.puff { width: calc(34 * var(--u)); height: calc(34 * var(--u)); margin: calc(-17 * var(--u)); border-radius: 50%;
+      border: calc(5 * var(--u)) solid rgba(var(--rgb), 0.85); box-shadow: 0 0 calc(10 * var(--u)) rgba(var(--rgb), 0.8); }
+    .fx.ringwave { width: calc(200 * var(--u)); height: calc(200 * var(--u)); margin: calc(-100 * var(--u)); border-radius: 50%;
+      border: calc(4 * var(--u)) solid rgba(var(--rgb), 0.9); box-shadow: 0 0 calc(18 * var(--u)) rgba(var(--rgb), 0.8); }
 
     /* ---- the face ---- */
     #face { position: absolute; inset: 0; --gx: 0; --gy: 0; --qx: 0; --qy: 0; --ox: 0; --oy: 0; --tilt: 0deg; --ps: 1; --es: 1; }
@@ -49,7 +70,58 @@
       display: flex; align-items: center; justify-content: center;
       clip-path: inset(-50% -50% -50% -50%);
       transition: transform 0.07s ease-in, border-color 0.25s, border-width 0.25s, opacity 0.25s, clip-path 0.9s ease-in-out; }
-    .ring.blink { transform: scaleY(0.07) scaleX(1.08); transition-duration: 0.06s; }
+    /* The eye's normal look (ring or pill) sits in .base; expressions swap it for a glyph. */
+    .base { position: absolute; inset: 0; transition: transform 0.07s ease-in, opacity 0.12s; }
+    .base.blink { transform: scaleY(0.07) scaleX(1.08); transition-duration: 0.06s; }
+    .pill { display: none; position: absolute; left: 50%; top: 50%; width: calc(84 * var(--u)); height: calc(160 * var(--u));
+      margin: calc(-80 * var(--u)) 0 0 calc(-42 * var(--u)); border-radius: calc(42 * var(--u)); background: var(--primary);
+      box-shadow: 0 0 calc(30 * var(--u)) rgba(var(--rgb), 0.8), inset 0 calc(-14 * var(--u)) calc(24 * var(--u)) rgba(255, 255, 255, 0.18);
+      transform: translate(calc((var(--gx) + var(--qx) + var(--ox)) * 56 * var(--u)), calc((var(--gy) + var(--qy) + var(--oy)) * 34 * var(--u))) scale(var(--ps)) scaleY(var(--ph, 1));
+      transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1); }
+    .pill::after { content: ""; position: absolute; left: 22%; top: 12%; width: 26%; height: 16%; border-radius: 50%; background: rgba(255, 255, 255, 0.75); }
+    #face.base-pills .ring { display: none; }
+    #face.base-pills .pill { display: block; }
+    /* Looking up or down squashes the pills a little, like the reference faces. */
+    #face.base-pills.think, #face.base-pills.glance-down, #face.base-pills.watching { --ph: 0.8; }
+    #face.base-pills.surprised { --ps: 1.12; }
+    /* Glyph eyes: one shape per eye, drawn in the theme colour with a glow. */
+    .glyph { position: absolute; inset: calc(10 * var(--u)); overflow: visible; filter: drop-shadow(0 0 calc(14 * var(--u)) rgba(var(--rgb), 0.95)); }
+    .glyph > g { display: none; transform-box: view-box; transform-origin: 50% 50%; }
+    .glyph > g.on { display: inline; }
+    .glyph .f { fill: var(--primary); }
+    .glyph .s { fill: none; stroke: var(--primary); stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+    .eye.has-glyph .base { opacity: 0; transform: scale(0.6); }
+    /* Changing expression: a quick blink, then the new eyes bounce in (squash and stretch). */
+    .eyes.swap .eye { animation: swap 0.42s cubic-bezier(0.3, 1.2, 0.5, 1); }
+    @keyframes swap { 22% { transform: scale(var(--es)) scaleY(0.06) scaleX(1.12); } 55% { transform: scale(var(--es)) scaleY(1.16) scaleX(0.9); }
+      75% { transform: scale(var(--es)) scaleY(0.96) scaleX(1.03); } }
+    .glyph > g[data-g="heart"].on { animation: beat 0.9s ease-in-out infinite; }
+    .glyph > g[data-g="star"].on { animation: twinkle 1.3s ease-in-out infinite; }
+    @keyframes twinkle { 50% { transform: scale(0.78) rotate(18deg); } }
+    .glyph > g[data-g="spiral"].on { animation: spin 1.1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .glyph > g[data-g="gt"].on, .glyph > g[data-g="lt"].on { animation: squeeze 0.32s ease-in-out infinite alternate; }
+    @keyframes squeeze { to { transform: scaleX(0.82) scaleY(1.06); } }
+    .glyph > g[data-g="angryL"].on, .glyph > g[data-g="angryR"].on { animation: tremble 0.14s linear infinite alternate; }
+    @keyframes tremble { to { transform: translateX(2px); } }
+    .glyph > g[data-g="sadL"].on, .glyph > g[data-g="sadR"].on { animation: droop 2.2s ease-in-out infinite alternate; }
+    @keyframes droop { to { transform: translateY(5px); } }
+    .glyph > g[data-g="chev"].on, .glyph > g[data-g="arcUp"].on { animation: bob 0.7s ease-in-out infinite alternate; }
+    @keyframes bob { to { transform: translateY(-5px); } }
+    .glyph > g[data-g="thumb"].on { animation: pop 0.5s cubic-bezier(0.3, 1.8, 0.5, 1), wiggle 0.9s ease-in-out 0.5s infinite; }
+    @keyframes pop { from { transform: scale(0.2) rotate(-30deg); } }
+    @keyframes wiggle { 50% { transform: rotate(-10deg); } }
+    #face.calm .glyph > g.on { animation: none !important; }
+    /* little extras around the eyes */
+    .deco { position: absolute; opacity: 0; transition: opacity 0.3s; color: var(--primary); pointer-events: none;
+      font: 800 calc(84 * var(--u))/1 var(--cy-font); text-shadow: 0 0 calc(16 * var(--u)) rgba(var(--rgb), 0.9); }
+    .qmark { top: 17%; right: 24%; animation: bob 0.8s ease-in-out infinite alternate; }
+    .sweat { top: 20%; right: 25%; display: flex; gap: calc(12 * var(--u)); }
+    .sweat i { display: block; width: calc(9 * var(--u)); height: calc(36 * var(--u)); border-radius: 99px; background: var(--primary);
+      box-shadow: 0 0 calc(10 * var(--u)) rgba(var(--rgb), 0.9); animation: drip 1s ease-in infinite; }
+    .sweat i:nth-child(2) { height: calc(46 * var(--u)); animation-delay: 0.2s; } .sweat i:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes drip { 60% { transform: translateY(calc(6 * var(--u))); opacity: 0.6; } }
+    #face.confused .qmark, #face.awkward .sweat { opacity: 1; }
     /* Sparkle eyes: a dark core with a bright rim and two white shines. */
     .pupil { position: relative; width: calc(104 * var(--u)); height: calc(104 * var(--u)); border-radius: 50%;
       background: radial-gradient(circle at 50% 60%, var(--cy-bg3) 0%, var(--cy-bg2) 42%, rgba(var(--rgb), 0.75) 80%, rgb(var(--shine)) 100%);
@@ -59,13 +131,6 @@
     .pupil i { position: absolute; border-radius: 50%; background: #fff; box-shadow: 0 0 calc(10 * var(--u)) rgba(255, 255, 255, 0.9); }
     .pupil .s1 { width: 34%; height: 34%; left: 16%; top: 12%; }
     .pupil .s2 { width: 13%; height: 13%; right: 20%; bottom: 20%; }
-    /* Sleepy: the top of the eye is hidden and a glowing eyelid line sits on the edge. */
-    .lid { position: absolute; left: calc(10 * var(--u)); right: calc(10 * var(--u)); top: calc(46% - 6 * var(--u)); height: calc(12 * var(--u));
-      border-radius: calc(6 * var(--u)); z-index: 2; background: var(--primary); box-shadow: 0 0 calc(16 * var(--u)) rgba(var(--rgb), 0.9);
-      opacity: 0; transform: scaleX(0.6); transition: opacity 0.5s 0.4s, transform 0.6s 0.4s; }
-    .heart { position: absolute; inset: calc(22 * var(--u)); opacity: 0; transform: scale(0.4);
-      transition: opacity 0.25s, transform 0.35s cubic-bezier(0.3, 1.7, 0.5, 1); filter: drop-shadow(0 0 calc(18 * var(--u)) rgba(var(--rgb), 0.95)); }
-    .heart path { fill: var(--primary); }
     .blush { position: absolute; top: calc(205 * var(--u)); width: calc(120 * var(--u)); height: calc(48 * var(--u)); border-radius: 50%; opacity: 0; transition: opacity 0.5s;
       background: radial-gradient(closest-side, rgba(var(--rgb), 0.8), rgba(var(--rgb), 0.3) 60%, transparent); filter: blur(2px); }
     .eye.l .blush { left: calc(-54 * var(--u)); } .eye.r .blush { right: calc(-54 * var(--u)); }
@@ -93,25 +158,36 @@
     #face.think { --gx: 0.55; --gy: -0.7; --es: 0.96; }
     #face.think .dots { opacity: 1; }
     #face.think .mouth { width: calc(38 * var(--u)); height: calc(10 * var(--u)); border-radius: calc(6 * var(--u)); transform: translateX(calc(18 * var(--u))); }
-    #face.happy .ring, #face.wink .eye.r .ring { border-color: var(--primary) transparent transparent transparent; border-width: calc(26 * var(--u));
+    #face.happy .ring { border-color: var(--primary) transparent transparent transparent; border-width: calc(26 * var(--u));
       transform: translateY(calc(30 * var(--u))); box-shadow: none; filter: drop-shadow(0 0 calc(14 * var(--u)) rgba(var(--rgb), 0.9)); }
-    #face.happy .pupil, #face.wink .eye.r .pupil { opacity: 0; }
-    #face.happy .mouth, #face.wink .mouth, #face.love .mouth { width: calc(104 * var(--u)); height: calc(38 * var(--u)); }
-    #face.happy .blush, #face.love .blush, #face.wink .blush { opacity: 1; }
-    #face.love .ring { opacity: 0; transform: scale(0.6); }
-    #face.love .heart { opacity: 1; transform: scale(1); animation: beat 0.9s ease-in-out infinite 0.35s; }
+    #face.happy .pupil { opacity: 0; }
+    #face.happy .mouth, #face.wink .mouth, #face.love .mouth, #face.sparkle .mouth, #face.thumbs .mouth { width: calc(104 * var(--u)); height: calc(38 * var(--u)); }
+    #face.happy .blush, #face.love .blush, #face.wink .blush, #face.shy .blush, #face.laugh .blush { opacity: 1; }
     @keyframes beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.12); } 40% { transform: scale(0.97); } }
+    /* mouths for the new moods */
+    #face.laugh .mouth { width: calc(100 * var(--u)); height: calc(52 * var(--u)); border-width: calc(7 * var(--u)); border-radius: 0 0 calc(60 * var(--u)) calc(60 * var(--u)); }
+    #face.shy .mouth { width: calc(44 * var(--u)); height: calc(16 * var(--u)); }
+    #face.dizzy .mouth { width: calc(40 * var(--u)); height: calc(40 * var(--u)); border-width: calc(7 * var(--u)); border-radius: 50%; }
+    #face.confused .mouth { width: calc(46 * var(--u)); height: calc(8 * var(--u)); border-radius: calc(6 * var(--u)); transform: translateX(calc(16 * var(--u))) rotate(-10deg); }
+    #face.awkward .mouth, #face.bored .mouth { width: calc(64 * var(--u)); height: calc(7 * var(--u)); border-radius: calc(4 * var(--u)); }
+    #face.sad .mouth, #face.grumpy .mouth { border-bottom-width: 0; border-top-width: calc(7 * var(--u)); border-radius: calc(50 * var(--u)) calc(50 * var(--u)) 0 0;
+      width: calc(62 * var(--u)); height: calc(22 * var(--u)); margin-top: calc(48 * var(--u)); box-shadow: 0 calc(-8 * var(--u)) calc(20 * var(--u)) calc(-6 * var(--u)) rgba(var(--rgb), 0.8); }
+    #face.grumpy .mouth { width: calc(46 * var(--u)); height: calc(14 * var(--u)); }
+    #face.laugh:not(.calm) .breath { animation: giggle 0.3s ease-in-out infinite alternate; }
+    @keyframes giggle { to { transform: translateY(calc(-6 * var(--u))) rotate(1deg); } }
+    #face.dizzy:not(.calm) .eyes { animation: wobble 1.2s ease-in-out infinite; }
+    @keyframes wobble { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
     #face.surprised { --es: 1.16; --ps: 0.7; }
     #face.surprised .mouth { width: calc(58 * var(--u)); height: calc(66 * var(--u)); border-width: calc(7 * var(--u)); border-radius: 50%; }
     #face.surprised:not(.calm) .breath { animation: hop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1); }
     @keyframes hop { 40% { transform: translateY(calc(-26 * var(--u))); } }
     #face.sleepy { --gy: 0.35; }
-    #face.sleepy .ring { clip-path: inset(46% -50% -50% -50%); }
-    #face.sleepy .lid { opacity: 1; transform: scaleX(1); }
     #face.sleepy .zzz { opacity: 1; }
     #face.sleepy .mouth { width: calc(34 * var(--u)); height: calc(8 * var(--u)); border-radius: calc(6 * var(--u)); }
     #face.wake .eye { animation: stretch 0.9s cubic-bezier(0.3, 1.5, 0.5, 1); }
     @keyframes stretch { 0% { transform: scaleY(0.4); } 35% { transform: scaleY(1.18) scaleX(0.92); } 60% { transform: scaleY(0.94) scaleX(1.04); } 100% { transform: scale(1); } }
+    /* A game is on the chest screen: the face watches it. */
+    #face.watching { --gx: -0.1; --gy: 0.8; --ps: 1.08; --qx: 0; --qy: 0; }
     /* A card appeared on the chest: a quick look down at it (works while talking too). */
     #face.glance-down { --gx: -0.15; --gy: 1; --qx: 0; --qy: 0; }
     #face.calm .eyes, #face.calm .eye { transition-duration: 0.6s; transition-timing-function: ease; }
@@ -134,19 +210,59 @@
   </div>
 
   <div class="face-visor" id="visor">
+    <div id="fx"></div>
     <div id="face" class="idle">
       <div class="breath">
         <div class="eyes">
-          <div class="eye l"><div class="ring"><div class="pupil"><i class="s1"></i><i class="s2"></i></div></div><div class="lid"></div>
-            <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></svg>
+          <div class="eye l">
+            <div class="base"><div class="ring"><div class="pupil"><i class="s1"></i><i class="s2"></i></div></div><div class="pill"></div></div>
+            <svg class="glyph" viewBox="0 0 100 100" aria-hidden="true">
+              <g data-g="heart"><g transform="translate(6 6) scale(3.67)" class="f"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></g></g>
+              <g data-g="star"><path class="f" d="M50 6C54 36 64 46 94 50C64 54 54 64 50 94C46 64 36 54 6 50C36 46 46 36 50 6Z"/></g>
+              <g data-g="line"><rect class="f" x="12" y="44" width="76" height="13" rx="6.5"/></g>
+              <g data-g="chev"><polyline class="s" points="16,66 50,32 84,66"/></g>
+              <g data-g="arcUp"><path class="s" d="M14 62Q50 22 86 62"/></g>
+              <g data-g="arcDown"><path class="s" d="M14 44Q50 84 86 44"/></g>
+              <g data-g="half"><path class="f" d="M18 44A32 32 0 0 0 82 44Z"/></g>
+              <g data-g="spiral"><path class="s" style="stroke-width:7" d=""/></g>
+              <g data-g="gt"><polyline class="s" points="26,22 76,50 26,78"/></g>
+              <g data-g="lt"><polyline class="s" points="74,22 24,50 74,78"/></g>
+              <g data-g="angryL"><path class="f" d="M12 34L88 56L88 64Q50 98 12 64Z"/></g>
+              <g data-g="angryR"><path class="f" d="M88 34L12 56L12 64Q50 98 88 64Z"/></g>
+              <g data-g="sadL"><path fill="url(#sadFill)" d="M18 40L82 18L82 84Q82 92 74 92L26 92Q18 92 18 84Z"/></g>
+              <g data-g="sadR"><path fill="url(#sadFill)" d="M82 40L18 18L18 84Q18 92 26 92L74 92Q82 92 82 84Z"/></g>
+              <g data-g="thumb"><g transform="translate(8 8) scale(3.5)" class="s" style="stroke-width:2.2"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/><path d="M7 11l4-9a3 3 0 0 1 3 3v4h5.5a2 2 0 0 1 2 2.3l-1.4 9A2 2 0 0 1 18 22H7z"/></g></g>
+            </svg>
             <div class="blush"></div></div>
-          <div class="eye r"><div class="ring"><div class="pupil"><i class="s1"></i><i class="s2"></i></div></div><div class="lid"></div>
-            <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></svg>
+          <div class="eye r">
+            <div class="base"><div class="ring"><div class="pupil"><i class="s1"></i><i class="s2"></i></div></div><div class="pill"></div></div>
+            <svg class="glyph" viewBox="0 0 100 100" aria-hidden="true">
+              <g data-g="heart"><g transform="translate(6 6) scale(3.67)" class="f"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></g></g>
+              <g data-g="star"><path class="f" d="M50 6C54 36 64 46 94 50C64 54 54 64 50 94C46 64 36 54 6 50C36 46 46 36 50 6Z"/></g>
+              <g data-g="line"><rect class="f" x="12" y="44" width="76" height="13" rx="6.5"/></g>
+              <g data-g="chev"><polyline class="s" points="16,66 50,32 84,66"/></g>
+              <g data-g="arcUp"><path class="s" d="M14 62Q50 22 86 62"/></g>
+              <g data-g="arcDown"><path class="s" d="M14 44Q50 84 86 44"/></g>
+              <g data-g="half"><path class="f" d="M18 44A32 32 0 0 0 82 44Z"/></g>
+              <g data-g="spiral"><path class="s" style="stroke-width:7" d=""/></g>
+              <g data-g="gt"><polyline class="s" points="26,22 76,50 26,78"/></g>
+              <g data-g="lt"><polyline class="s" points="74,22 24,50 74,78"/></g>
+              <g data-g="angryL"><path class="f" d="M12 34L88 56L88 64Q50 98 12 64Z"/></g>
+              <g data-g="angryR"><path class="f" d="M88 34L12 56L12 64Q50 98 88 64Z"/></g>
+              <g data-g="sadL"><path fill="url(#sadFill)" d="M18 40L82 18L82 84Q82 92 74 92L26 92Q18 92 18 84Z"/></g>
+              <g data-g="sadR"><path fill="url(#sadFill)" d="M82 40L18 18L18 84Q18 92 26 92L74 92Q82 92 82 84Z"/></g>
+              <g data-g="thumb"><g transform="translate(8 8) scale(3.5)" class="s" style="stroke-width:2.2"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/><path d="M7 11l4-9a3 3 0 0 1 3 3v4h5.5a2 2 0 0 1 2 2.3l-1.4 9A2 2 0 0 1 18 22H7z"/></g></g>
+            </svg>
             <div class="blush"></div></div>
         </div>
         <div class="mouth" id="mouth"></div>
         <div class="dots"><i></i><i></i><i></i></div>
         <div class="zzz"><span>z</span><span>z</span><span>z</span></div>
+        <div class="deco qmark">?</div>
+        <div class="deco sweat"><i></i><i></i><i></i></div>
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+          <linearGradient id="sadFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--primary); stop-opacity: 0.12"/><stop offset="0.55" style="stop-color: var(--primary); stop-opacity: 0.75"/><stop offset="1" style="stop-color: var(--primary); stop-opacity: 1"/></linearGradient>
+        </defs></svg>
       </div>
     </div>
   </div>
@@ -159,12 +275,33 @@
 
     const face = document.getElementById('face');
     const mouth = document.getElementById('mouth');
-    const rings = [...document.querySelectorAll('#face .ring')];
+    const bases = [...document.querySelectorAll('#face .base')];
+    const eyesEl = document.querySelector('#face .eyes');
+    const eyeEls = [...document.querySelectorAll('#face .eye')];
+    // An Archimedean spiral for the dizzy eyes.
+    (function () {
+      let d = '';
+      for (let t = 0; t <= 6 * Math.PI; t += 0.25) { const r = 3 + t * 2.1; d += `${d ? 'L' : 'M'}${(50 + r * Math.cos(t)).toFixed(1)} ${(50 + r * Math.sin(t)).toFixed(1)}`; }
+      document.querySelectorAll('.glyph > g[data-g="spiral"] path').forEach((p) => p.setAttribute('d', d));
+    })();
     const btnToggleTheme = document.getElementById('btnToggleTheme');
-    const EXPRESSIONS = ['idle', 'listen', 'think', 'speak', 'happy', 'love', 'surprised', 'sleepy', 'wake', 'wink'];
+    const EXPRESSIONS = ['idle', 'listen', 'think', 'speak', 'happy', 'love', 'surprised', 'sleepy', 'wake', 'wink',
+      'shy', 'laugh', 'sparkle', 'dizzy', 'confused', 'awkward', 'sad', 'grumpy', 'thumbs', 'bored'];
+    // Which shape each eye shows per expression (left, right); 'base' is the normal eye.
+    const GLYPHS = {
+      love: ['heart', 'heart'], sparkle: ['star', 'star'], shy: ['arcUp', 'arcUp'], laugh: ['gt', 'lt'],
+      dizzy: ['spiral', 'spiral'], confused: ['line', 'line'], awkward: ['half', 'half'], sad: ['sadL', 'sadR'],
+      grumpy: ['angryL', 'angryR'], thumbs: ['line', 'thumb'], wink: ['base', 'lt'], sleepy: ['arcDown', 'arcDown'],
+      bored: ['line', 'line'],
+    };
+    // Moments: how long each shows (ms), and what follows it.
+    const MOMENTS = {
+      love: [2600], shy: [2600], laugh: [2200], sparkle: [2200, ['happy', 1200]], dizzy: [2000], confused: [2600],
+      awkward: [2400], sad: [2800], grumpy: [1800], thumbs: [2000], wink: [2000], surprised: [1400, ['happy', 1500]],
+    };
 
     let currentState = { theme: 'RED', expression: 'IDLE', eye_x: 0, eye_y: 0, voice_status: 'OFFLINE', card: null,
-      face_life: { calm: false, sleep_after: 120 }, last_spoken_text: '' };
+      face_life: { calm: false, sleep_after: 120, eyes: 'rings' }, last_spoken_text: '' };
 
     // ---------- page chrome (unchanged) ----------
     let idleCursorTimer = null;
@@ -223,15 +360,40 @@
     function showMoment(name, ms, then) {
       clearTimeout(momentTimer);
       moment = name; render();
+      celebrate(name);
       momentTimer = setTimeout(() => { moment = null; if (then) showMoment(then[0], then[1]); else render(); }, ms);
     }
+    let shownGlyphs = 'base,base', swapTimer = 0;
+    function current() { return moment || (sleeping ? 'sleepy' : baseExpression()); }
+    function glyphsFor(x) {
+      if (x === 'happy' && face.classList.contains('base-pills')) return ['chev', 'chev'];  // ^ ^ with pill eyes
+      return GLYPHS[x] || ['base', 'base'];
+    }
+    function applyGlyphs(g) {
+      eyeEls.forEach((eye, i) => {
+        eye.classList.toggle('has-glyph', g[i] !== 'base');
+        eye.querySelectorAll('.glyph > g').forEach((el) => el.classList.toggle('on', el.dataset.g === g[i]));
+      });
+    }
     function render() {
-      const x = moment || (sleeping ? 'sleepy' : baseExpression());
+      const x = current();
+      face.classList.toggle('base-pills', (currentState.face_life && currentState.face_life.eyes) === 'pills');
       EXPRESSIONS.forEach((e) => face.classList.toggle(e, e === x));
+      // Swap the eye shapes behind a quick blink, so changes feel alive rather than cut.
+      const g = glyphsFor(x), key = g.join(',');
+      if (key !== shownGlyphs) {
+        shownGlyphs = key;
+        clearTimeout(swapTimer);
+        eyesEl.classList.remove('swap'); void eyesEl.offsetWidth; eyesEl.classList.add('swap');
+        swapTimer = setTimeout(() => applyGlyphs(g), 90);
+        setTimeout(() => eyesEl.classList.remove('swap'), 440);
+      }
+      face.classList.toggle('watching', Boolean(currentState.game_playing) && (x === 'idle' || x === 'listen'));
       face.classList.toggle('calm', calm());
       face.style.setProperty('--ox', (Number(currentState.eye_x) || 0).toFixed(2));  // operator eye control
       face.style.setProperty('--oy', (Number(currentState.eye_y) || 0).toFixed(2));
-      if (x === 'speak') startMouth(); else stopMouth();
+      // The mouth keeps talking through a moment (hearts, a laugh...) if Cynobot is speaking.
+      if (x === 'speak' || (moment && baseExpression() === 'speak')) startMouth(); else stopMouth();
     }
 
     // ---------- Step 2: moments ----------
@@ -241,7 +403,7 @@
     }
     function busy() {
       const s = currentState;
-      return s.voice_status !== 'OFFLINE' || (s.expression && s.expression !== 'IDLE') || ttsSpeaking;
+      return s.voice_status !== 'OFFLINE' || (s.expression && s.expression !== 'IDLE') || ttsSpeaking || Boolean(s.game_playing);
     }
     setInterval(() => {  // doze off when nobody has talked to Cynobot for a while
       const after = Number(currentState.face_life && currentState.face_life.sleep_after) || 0;
@@ -255,9 +417,8 @@
       lastMomentId = m.id;
       if (!fresh) return;
       noteActivity();
-      if (m.name === 'love') showMoment('love', 2600);
-      else if (m.name === 'wink') { blinkNow(); showMoment('wink', 2000); }
-      else if (m.name === 'surprised') showMoment('surprised', 1400, ['happy', 1500]);
+      const spec = MOMENTS[m.name];
+      if (spec) showMoment(m.name, spec[0], spec[1]);
     }
     function onCard(card) {
       const key = card ? (card.id || card.title || JSON.stringify(card).slice(0, 80)) : null;
@@ -271,25 +432,110 @@
 
     // ---------- Step 1: blinks (random, sometimes double) and glances ----------
     function blinkNow() {
-      rings.forEach((r) => r.classList.add('blink'));
-      setTimeout(() => rings.forEach((r) => r.classList.remove('blink')), 120);
+      bases.forEach((r) => r.classList.add('blink'));
+      setTimeout(() => bases.forEach((r) => r.classList.remove('blink')), 120);
     }
     (function blinkLoop() {
-      const x = moment || (sleeping ? 'sleepy' : baseExpression());
-      if (!['happy', 'love', 'sleepy', 'wink', 'wake'].includes(x)) {
+      const x = current();
+      if (!['happy', 'wake'].includes(x) && glyphsFor(x).join(',') === 'base,base') {
         blinkNow();
         if (!calm() && Math.random() < 0.22) setTimeout(blinkNow, 260);
       }
       setTimeout(blinkLoop, calm() ? 5000 : 2000 + Math.random() * 4000);
     })();
     (function glanceLoop() {
-      const x = moment || (sleeping ? 'sleepy' : baseExpression());
-      if (!calm() && (x === 'idle' || x === 'listen')) {
+      const x = current();
+      if (!calm() && (x === 'idle' || x === 'listen') && !currentState.game_playing) {
         face.style.setProperty('--qx', (Math.random() * 1.2 - 0.6).toFixed(2));
         face.style.setProperty('--qy', (Math.random() * 0.8 - 0.4).toFixed(2));
         setTimeout(() => { face.style.setProperty('--qx', 0); face.style.setProperty('--qy', 0); }, 700 + Math.random() * 900);
       }
       setTimeout(glanceLoop, 3000 + Math.random() * 4000);
+    })();
+
+    // ---------- bursts: small shapes in the theme colour that pop out with a moment ----------
+    const fxLayer = document.getElementById('fx'), visor = document.getElementById('visor');
+    const HEART = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 21.2l-1.4-1.3C5.4 15.2 2 12.1 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.7-3.4 6.8-8.6 11.5L12 21.2z"/></svg>';
+    const STAR = '<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="M50 4C54 36 64 46 96 50C64 54 54 64 50 96C46 64 36 54 4 50C36 46 46 36 50 4Z"/></svg>';
+    const unit = () => Math.min(innerWidth, innerHeight) * 0.00125;  // one design unit in pixels
+    function eyeCentre(side) {
+      const v = visor.getBoundingClientRect(), r = eyeEls[side === 'r' ? 1 : 0].getBoundingClientRect();
+      return { x: r.left + r.width / 2 - v.left, y: r.top + r.height / 2 - v.top, w: r.width };
+    }
+    function spawn(cls, html, x, y, size, frames, ms, delay = 0) {
+      const el = document.createElement('div');
+      el.className = 'fx ' + cls;
+      if (html) { el.innerHTML = html; el.style.width = el.style.height = size + 'px'; el.style.margin = (-size / 2) + 'px'; }
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+      fxLayer.appendChild(el);
+      const a = el.animate(frames, { duration: ms, delay, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'both' });
+      a.onfinish = () => el.remove();
+    }
+    const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+    function celebrate(name) {
+      if (calm() || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+      const u = unit(), L = eyeCentre('l'), R = eyeCentre('r'), both = [L, R];
+      if (name !== 'bored' && name !== 'wake') { visor.classList.remove('flash'); void visor.offsetWidth; visor.classList.add('flash'); }
+      if (name === 'love') both.forEach((e) => { for (let k = 0; k < 4; k++) {   // hearts float up and sway
+        const dx = rand(-70, 70) * u;
+        spawn('', HEART, e.x + rand(-40, 40) * u, e.y - 60 * u, rand(26, 46) * u,
+          [{ transform: 'translate(0,0) scale(0.2)', opacity: 0 }, { transform: `translate(${dx / 2}px, ${-80 * u}px) scale(1)`, opacity: 1, offset: 0.3 },
+           { transform: `translate(${dx}px, ${-240 * u}px) scale(0.7) rotate(${rand(-25, 25)}deg)`, opacity: 0 }], 1600, k * 220);
+      } });
+      else if (name === 'sparkle' || name === 'wink') (name === 'wink' ? [R] : both).forEach((e) => { for (let k = 0; k < (name === 'wink' ? 5 : 9); k++) {   // a burst of tiny stars
+        const a = rand(0, Math.PI * 2), d = rand(110, 190) * u;
+        spawn('', STAR, e.x, e.y, rand(18, 34) * u,
+          [{ transform: 'translate(0,0) scale(0) rotate(0deg)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d}px) scale(1) rotate(90deg)`, opacity: 1, offset: 0.6 },
+           { transform: `translate(${Math.cos(a) * d * 1.15}px, ${Math.sin(a) * d * 1.15}px) scale(0) rotate(160deg)`, opacity: 0 }], 1100, k * 40);
+      } });
+      else if (name === 'thumbs') for (let k = 0; k < 22; k++) {   // confetti pops from the thumb
+        const a = rand(-Math.PI, 0), d = rand(120, 260) * u;
+        spawn('dot' + (k % 3 ? '' : ' shine'), '', R.x, R.y, 0,
+          [{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d}px) scale(1)`, opacity: 1, offset: 0.55 },
+           { transform: `translate(${Math.cos(a) * d * 1.1}px, ${Math.sin(a) * d + 160 * u}px) scale(0.4)`, opacity: 0 }], 1300, k * 15);
+      }
+      else if (name === 'laugh') ['ha', 'ha', 'ha'].forEach((w, k) => {   // "ha" bounces out of each side
+        const e = k % 2 ? R : L, side = k % 2 ? 1 : -1;
+        spawn('word', '', e.x + side * 150 * u, e.y - 40 * u, 0,
+          [{ transform: 'translate(0,0) scale(0.3)', opacity: 0 }, { transform: `translate(${side * 30 * u}px, ${-50 * u}px) scale(1.1)`, opacity: 1, offset: 0.35 },
+           { transform: `translate(${side * 60 * u}px, ${-110 * u}px) scale(0.9)`, opacity: 0 }], 1100, k * 300);
+        fxLayer.lastChild.textContent = w;
+      });
+      else if (name === 'dizzy') for (let k = 0; k < 3; k++) {   // little stars circle the head
+        const cx = (L.x + R.x) / 2, cy = L.y - 170 * u, frames = [];
+        for (let f = 0; f <= 12; f++) { const a = (f / 12) * Math.PI * 4 + k * 2.09; frames.push({ transform: `translate(${Math.cos(a) * 160 * u}px, ${Math.sin(a) * 34 * u}px) scale(${0.8 + Math.sin(a) * 0.25})`, opacity: f === 12 ? 0 : 1 }); }
+        spawn('', STAR, cx, cy, 30 * u, frames, 1900);
+      }
+      else if (name === 'sad') spawn('tear', '', L.x + 40 * u, L.y + 70 * u, 0,   // one glowing tear
+        [{ transform: 'translateY(0) scale(0.3)', opacity: 0 }, { transform: `translateY(${20 * u}px) scale(1)`, opacity: 1, offset: 0.25 },
+         { transform: `translateY(${170 * u}px) scale(0.8)`, opacity: 0 }], 1800, 300);
+      else if (name === 'grumpy') [L, R].forEach((e, side) => { for (let k = 0; k < 3; k++) {   // steam puffs
+        const dir = side ? 1 : -1;
+        spawn('puff', '', e.x + dir * 110 * u, e.y - 120 * u, 0,
+          [{ transform: 'translate(0,0) scale(0.3)', opacity: 0.9 }, { transform: `translate(${dir * 50 * u}px, ${-110 * u}px) scale(1.4)`, opacity: 0 }], 900, k * 260);
+      } });
+      else if (name === 'surprised') both.forEach((e) => spawn('ringwave', '', e.x, e.y, 0,   // a ring pops out of each eye
+        [{ transform: 'scale(0.5)', opacity: 0.9 }, { transform: 'scale(1.9)', opacity: 0 }], 700));
+      else if (name === 'shy') both.forEach((e) => { for (let k = 0; k < 2; k++)   // a couple of tiny hearts by the cheeks
+        spawn('', HEART, e.x + (e === L ? -90 : 90) * u, e.y + 60 * u, 22 * u,
+          [{ transform: 'translate(0,0) scale(0)', opacity: 0 }, { transform: `translate(0, ${-60 * u}px) scale(1)`, opacity: 1, offset: 0.4 },
+           { transform: `translate(0, ${-130 * u}px) scale(0.6)`, opacity: 0 }], 1400, 200 + k * 400); });
+      else if (name === 'wake') both.forEach((e) => { for (let k = 0; k < 5; k++) {
+        const a = rand(0, Math.PI * 2), d = rand(90, 150) * u;
+        spawn('dot shine', '', e.x, e.y, 0, [{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d}px)`, opacity: 0 }], 800);
+      } });
+    }
+
+    // ---------- idle moods: now and then, with nobody talking, a little mood plays ----------
+    (function moodLoop() {
+      const quiet = !moment && !sleeping && baseExpression() === 'idle' && !currentState.game_playing;
+      if (!calm() && quiet && Date.now() - lastActivity > 15000) {
+        const pick = Math.random();
+        if (pick < 0.4) showMoment('bored', 1600);          // a flat, bored look
+        else if (pick < 0.7) showMoment('happy', 1300);     // humming to itself
+        else showMoment('sparkle', 1200);                   // something caught its eye
+      }
+      setTimeout(moodLoop, 25000 + Math.random() * 20000);
     })();
 
     // ---------- Step 3: the mouth follows Cynobot's voice ----------
@@ -301,6 +547,7 @@
       level += (target - level) * 0.45;
       mouth.style.width = `calc(${(62 + level * 34).toFixed(1)} * var(--u))`;
       mouth.style.height = `calc(${(12 + level * 52).toFixed(1)} * var(--u))`;
+      visor.style.setProperty('--lv', level.toFixed(2));
       requestAnimationFrame(mouthFrame);
     }
     function fakeSyllables() {
@@ -321,6 +568,7 @@
       if (!mouthOn) return;
       mouthOn = false; clearTimeout(fakeTimer); level = target = 0;
       mouth.classList.remove('talk'); mouth.style.width = mouth.style.height = '';
+      visor.style.setProperty('--lv', 0);
     }
     function onLevel(v) { levelAt = Date.now(); target = Math.max(0, Math.min(1, Number(v) || 0)); }
 

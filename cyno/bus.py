@@ -69,9 +69,9 @@ class StateBus:
                 self._clients.discard(ws)
         logger.debug(f"state -> {changes}")
 
-    # Face moments ("love", "surprised", "wink"): a one-off expression the head screen shows
+    # Face moments (hearts, a wink, a laugh...): a one-off expression the head screen shows
     # for a couple of seconds, then it goes back to whatever it was doing.
-    MOMENTS = ("love", "surprised", "wink")
+    MOMENTS = ("love", "surprised", "wink", "shy", "laugh", "sparkle", "dizzy", "confused", "awkward", "sad", "grumpy", "thumbs")
 
     async def moment(self, name: str):
         if name in self.MOMENTS:

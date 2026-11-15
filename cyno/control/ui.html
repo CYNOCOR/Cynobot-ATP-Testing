@@ -386,6 +386,7 @@
             <select class="field" id="selGameLimit" style="width:160px"><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select></div>
           <div class="row"><div class="row-main"><div class="row-title">Close when nobody is playing</div><div class="row-sub">A tap game closes after this long with no touch.</div></div>
             <select class="field" id="selGameIdle" style="width:160px"><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">1 minute</option></select></div>
+          <div class="row"><div class="row-main"><div class="row-title">Game sounds</div><div class="row-sub">Quiet bleeps for jumps, batteries and crashes in Cyno Run. Cynobot's voice is not affected.</div></div><label class="switch"><input type="checkbox" id="swGameSound" /><span></span></label></div>
         </div>
       </div>
 
@@ -422,6 +423,8 @@
           <div class="row"><div class="row-main"><div class="row-title">Chest background</div><div class="row-sub" id="sceneSub">The moving particle scene on the new chest screen. Lower it if the screen feels slow.</div></div>
             <select class="field" id="selScene" style="width:240px"><option value="auto">Automatic (recommended)</option><option value="full">Full: most particles</option><option value="light">Light: fewest particles</option><option value="off">Off: plain background</option></select></div>
           <div class="row"><div class="row-main"><div class="row-title">Face display</div><div class="row-sub">Second screen. Press F for fullscreen.</div></div><button class="btn" data-open="face">Open</button></div>
+          <div class="row"><div class="row-main"><div class="row-title">Eye style</div><div class="row-sub">How the face's eyes look. Every expression (hearts, stars, a laugh, a wink...) works with both.</div></div>
+            <select class="field" id="selEyes" style="width:180px"><option value="rings">Sparkle rings</option><option value="pills">Pills</option></select></div>
           <div class="row"><div class="row-main"><div class="row-title">Calm face</div><div class="row-sub">Stops the face glancing around, breathing and hopping, and blinks steadily. Expressions still show.</div></div><label class="switch"><input type="checkbox" id="swCalm" /><span></span></label></div>
           <div class="row"><div class="row-main"><div class="row-title">Face dozes off after</div><div class="row-sub">With nobody talking to Cynobot, the face gets sleepy. It wakes up when someone taps Tap to talk.</div></div>
             <select class="field" id="selSleep" style="width:180px"><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option><option value="0">Never</option></select></div>
@@ -763,7 +766,7 @@ document.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click'
 $('btnAlignReset').addEventListener('click', () => { setFrame({ ...frameDefault }); toast('Glow ring reset'); });
 // ---------- games ----------
 let gamesData = null;
-const SCORE_FMT = { riddles: s => `${s} / 5`, memory: s => `${s} moves`, puzzle: s => `${s} s`, wordchain: s => `${s} words` };
+const SCORE_FMT = { riddles: s => `${s} / 5`, memory: s => `${s} moves`, puzzle: s => `${s} s`, wordchain: s => `${s} words`, runner: s => `${s} points` };
 function renderGames() {
   const g = gamesData; if (!g) return;
   $('swGames').checked = g.settings.enabled;
@@ -775,6 +778,7 @@ function renderGames() {
     saveGames({ games: { [sw.dataset.game]: sw.checked } }, `${g.games.find(x => x.id === sw.dataset.game).title} ${sw.checked ? 'on' : 'off'}`)));
   $('selGameLimit').value = String(g.settings.time_limit_secs);
   if ($('selGameLimit').value !== String(g.settings.time_limit_secs)) $('selGameLimit').value = '120';
+  $('swGameSound').checked = g.settings.sound !== false;
   $('selGameIdle').value = String(g.settings.idle_secs);
   if ($('selGameIdle').value !== String(g.settings.idle_secs)) $('selGameIdle').value = '30';
   const best = Object.entries(g.best || {});
@@ -804,6 +808,7 @@ async function saveGames(changes, msg) {
 $('swGames').addEventListener('change', () => saveGames({ enabled: $('swGames').checked }, $('swGames').checked ? 'Games on' : 'Games off'));
 $('selGameLimit').addEventListener('change', () => saveGames({ time_limit_secs: Number($('selGameLimit').value) }, 'Time limit saved'));
 $('selGameIdle').addEventListener('change', () => saveGames({ idle_secs: Number($('selGameIdle').value) }, 'Saved'));
+$('swGameSound').addEventListener('change', () => saveGames({ sound: $('swGameSound').checked }, $('swGameSound').checked ? 'Game sounds on' : 'Game sounds off'));
 $('btnAddPics').addEventListener('click', async () => {
   const r = await call('add_puzzle_pictures');
   if (r && r.ok) { gamesData.pictures = r.pictures; renderPics(r.pictures); }
@@ -884,6 +889,7 @@ document.querySelector('[data-page="controls"]').addEventListener('click', loadS
 async function loadLife() {
   const r = await call('get_face_life'); if (!r) return;
   $('swCalm').checked = Boolean(r.calm);
+  $('selEyes').value = r.eyes === 'pills' ? 'pills' : 'rings';
   const sel = $('selSleep'), v = String(r.sleep_after);
   if (![...sel.options].some((o) => o.value === v)) sel.add(new Option(`${Math.round(r.sleep_after / 60)} minutes`, v));
   sel.value = v;
@@ -894,6 +900,7 @@ async function saveLife(change, msg) {
 }
 $('swCalm').addEventListener('change', () => saveLife({ calm: $('swCalm').checked }, $('swCalm').checked ? 'Calm face on' : 'Calm face off'));
 $('selSleep').addEventListener('change', () => saveLife({ sleep_after: Number($('selSleep').value) }, 'Saved'));
+$('selEyes').addEventListener('change', () => saveLife({ eyes: $('selEyes').value }, 'Eye style changed'));
 document.querySelector('[data-page="controls"]').addEventListener('click', loadLife);
 setInterval(() => { if ($('controls').classList.contains('active')) loadScene(); }, 5000);
 // ---------- knowledge ----------

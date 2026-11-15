@@ -71,6 +71,11 @@ It runs everything without a terminal:
   plus a master switch. A game ends at the time limit (default 2 minutes) and a tap game closes after 30 seconds
   with no touch. Today's best per game is kept with no names (`data/game_scores.json`). Riddles and the degree
   quiz live in `data/game_content.json`; puzzle pictures are added on the Games page (`data/media/puzzles/`).
+  **Cyno Run** (`runner.js`): an endless runner like the browser's dino game. Cynobot rolls along a neon circuit floor;
+  tap to jump (hold for higher), swipe down or tap low to duck under drones, and grab batteries (10 points each, plus
+  1 point a metre). Easy has 3 lives and starts slow; Normal is one crash and out. While it runs the particle background
+  rests and the head screen watches the game, gasps at a crash and shows hearts for a new best today. *Game sounds*
+  (on the Games page) switches its little bleeps on or off.
   **A question mid-game:** when a visitor asks Cynobot something during a game, the game steps aside with its clock
   paused, so the answer, card and QR code show. A *Back to …* button brings it back; it also returns by itself 20 seconds
   after the answer, or when the visitor says "back to the game". In Word Chain a single word is a move, not a question.
@@ -83,17 +88,27 @@ It runs everything without a terminal:
   Cyno Control. The PIN is stored only as a salted hash in `data/kiosk.json`. A keyboard can still quit a kiosk
   browser (Alt+F4 / Cmd+Q), so don't leave one attached to the robot.
 - **Chest screen design:** a particle scene (`particles.js`, plain WebGL, no downloads) sits behind minimal glass:
-  a ribbon when idle, a ring that ripples with the visitor's voice, a swirl while thinking, a wave while answering,
+  a slowly turning 3D brain of about 500 firing neurons when idle (`brain.js`: spikes cascade between neighbours like a live
+  brain scan, with a bigger wave every few seconds; it cross-fades with the particles, and the particles rest while it shows),
+  a ring that ripples with the visitor's voice, a swirl while thinking, a wave while answering,
   and a line drawing for the topic before its card. Facts pick their drawing automatically, or in the fact editor.
   The home screen has tap shortcuts (Find us, Courses, Apply, Games) that show a fact's card with no conversation.
   *Controls > Displays > Chest background* sets how much it draws (Automatic, Full, Light, Off) and shows the
-  frame rate the chest screen reports. With no 3D in the browser the page uses a plain background by itself.
+  frame rate the chest screen reports. Light draws about 300 neurons in the idle brain, Off shows no brain. The other idle
+  designs that were considered are kept at `/chest/idle-lab.html`. With no 3D in the browser the page uses a plain background by itself (the idle brain still shows, as it needs no 3D).
   The previous design is kept at `/chest/classic.html`.
 - **Face (head screen):** big sparkly eyes with blush, random blinks and glances, and a slow "breath". It listens
   with a head tilt, looks up with "..." while thinking, and its mouth follows Cynobot's voice (the chest page sends
   the loudness as it plays). Moments: heart eyes when a visitor says thank you or pays a compliment, a wink for
   goodbye, surprised-then-happy when a game finishes, a glance down when a card appears, and it dozes off ("z z z")
-  when nobody has talked to it for a while, waking with a stretch. *Controls > Displays* has a *Calm face* switch
+  when nobody has talked to it for a while, waking with a stretch.
+  **Expressions** are glowing shapes swapped in with a quick blink: hearts (thank you), shy arcs with blush (a
+  compliment), > < (the visitor laughs), stars ("wow"), a thumbs-up ("good job"), a wink (goodbye), spirals (a crash
+  in Cyno Run), "— — ?" (Cynobot isn't sure), sweat drops (Cynobot can't help), drooping eyes (the visitor is sad or
+  stressed), a pout (rude words), and ‿ ‿ when dozing. Each moment also pops small shapes in the theme colour (floating hearts, a star burst,
+  confetti, "ha", circling stars, a tear, steam puffs), the eyes bounce into the new look, and the frame flashes and glows
+  with Cynobot's voice. *Calm face* turns these off. Now and then, with nobody talking, it plays a small idle mood.
+  *Eye style* in Cyno Control picks Sparkle rings or Pills. Try every expression at `/face/expressions-test.html`. *Controls > Displays* has a *Calm face* switch
   (no glances, breathing or hops) and *Face dozes off after* (1 to 10 minutes, or never), stored in `data/display.json`.
 - **Colours (both screens):** the face and chest screens read their colours from one file,
   `cyno/web/shared/theme.css`, for the Red and the Blue theme: glow colour, text, background glow, glass tint and

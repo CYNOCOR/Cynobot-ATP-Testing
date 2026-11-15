@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Idle Screen Lab</title>
+  <!-- Preview only: candidate idle scenes for the chest screen, inspired by the cynocor.com splash
+       (nerve strands gathering, a woven figure, travelling pulses, rotating rings). Pick one; nothing
+       here changes the robot. Open http://localhost:7860/chest/idle-lab.html -->
+  <link rel="stylesheet" href="/shared/theme.css?v=1" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100vw; height: 100vh; overflow: hidden; color: var(--cy-text); font-family: var(--cy-font); -webkit-font-smoothing: antialiased; }
+    body { background: radial-gradient(ellipse 85% 75% at 50% 40%, var(--cy-bg1) 0%, var(--cy-bg2) 62%, var(--cy-bg3) 100%); }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #gl { display: none; }
+
+    /* C: the website's frame (rings, crosshair, nodes, watermark, scanlines) */
+    .hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.6s; }
+    body.frame .hud { opacity: 1; }
+    .hud .ring { position: absolute; left: 50%; top: 40%; border-radius: 50%; border: 1px dashed rgba(var(--cy-accent-rgb), 0.22); transform: translate(-50%, -50%); }
+    .hud .r1 { width: min(78vmin, 760px); height: min(78vmin, 760px); animation: spin 36s linear infinite; }
+    .hud .r2 { width: min(56vmin, 540px); height: min(56vmin, 540px); border-color: rgba(var(--cy-accent-rgb), 0.14); animation: spin 24s linear reverse infinite; }
+    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    .hud .cross::before, .hud .cross::after { content: ""; position: absolute; }
+    .hud .cross::before { left: 50%; top: 4%; bottom: 20%; width: 1px; background: linear-gradient(180deg, transparent, rgba(var(--cy-accent-rgb), 0.16), transparent); }
+    .hud .cross::after { top: 40%; left: 10%; right: 10%; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--cy-accent-rgb), 0.16), transparent); }
+    .hud .node { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: rgba(var(--cy-accent-rgb), 0.7); box-shadow: 0 0 12px rgba(var(--cy-accent-rgb), 0.7); animation: drift 6s ease-in-out infinite; }
+    @keyframes drift { 50% { transform: translate(8px, -10px); opacity: 0.4; } }
+    .hud .word { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font: 800 clamp(80px, 17vw, 260px)/1 var(--cy-font); letter-spacing: -0.04em;
+      color: rgba(var(--cy-text-rgb), 0.035); text-shadow: 0 0 60px rgba(var(--cy-accent-rgb), 0.12); white-space: nowrap; }
+    .hud .scan { position: absolute; inset: 0; background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 4px); }
+
+    /* the chest's home screen, for context */
+    .ui { position: fixed; inset: 0; pointer-events: none; }
+    .brand { position: absolute; top: 26px; left: 40px; font-size: 13px; font-weight: 600; letter-spacing: 0.34em; color: rgba(var(--cy-text-rgb), 0.56); }
+    .home { position: absolute; left: 0; right: 0; bottom: 120px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    .home h1 { font-size: clamp(30px, 4.2vw, 52px); font-weight: 300; letter-spacing: -0.02em; text-shadow: 0 0 22px var(--cy-bg2), 0 0 8px var(--cy-bg2); }
+    .home p { color: rgba(var(--cy-text-rgb), 0.58); font-size: 17px; text-shadow: 0 0 14px var(--cy-bg2); }
+    .home p b { color: var(--cy-accent); font-weight: 500; }
+    .talk { margin-top: 10px; height: 64px; padding: 0 36px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 20px;
+      border: 1.5px solid rgba(var(--cy-accent-rgb), 0.85); background: rgba(var(--cy-panel-rgb), 0.5);
+      box-shadow: 0 0 18px rgba(var(--cy-accent-rgb), 0.45), 0 0 46px rgba(var(--cy-accent-rgb), 0.16), inset 0 0 18px rgba(var(--cy-accent-rgb), 0.16); }
+
+    /* controls */
+    .bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center;
+      padding: 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(14px); z-index: 5; max-width: calc(100vw - 24px); }
+    .bar button { appearance: none; font: inherit; font-size: 13px; color: #ddd; cursor: pointer; height: 34px; padding: 0 14px; border-radius: 999px; background: transparent; border: 1px solid transparent; }
+    .bar button.on { background: rgba(255, 255, 255, 0.92); color: #111; }
+    .bar .sep { width: 1px; height: 22px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; }
+    .fps { font-size: 12px; color: #999; padding: 0 10px; font-variant-numeric: tabular-nums; }
+    .caption { position: fixed; top: 22px; right: 32px; max-width: 420px; text-align: right; font-size: 13px; color: rgba(var(--cy-text-rgb), 0.6); z-index: 5; }
+  </style>
+</head>
+<body class="frame">
+  <canvas id="cv"></canvas>
+  <canvas id="gl"></canvas>
+  <div class="hud" aria-hidden="true">
+    <div class="word">CYNOBOT</div>
+    <div class="ring r1"></div><div class="ring r2"></div><div class="cross"></div>
+    <span class="node" style="top:18%;left:18%"></span><span class="node" style="top:26%;right:20%;animation-delay:1.1s"></span>
+    <span class="node" style="top:58%;left:22%;animation-delay:2.2s"></span><span class="node" style="top:54%;right:16%;animation-delay:.7s"></span>
+    <span class="node" style="top:10%;left:52%;animation-delay:1.8s"></span>
+    <div class="scan"></div>
+  </div>
+  <div class="ui">
+    <div class="brand">CYNOBOT</div>
+    <div class="home"><h1>Hi, I'm Cynobot.</h1><p>Tap to talk, or pick a topic. · <b>we create future.</b></p><div class="talk">Tap to talk</div></div>
+  </div>
+  <div class="caption" id="caption"></div>
+  <div class="bar">
+    <button data-scene="globe">Globe (now)</button>
+    <button data-scene="core" class="on">A · Neural core</button>
+    <button data-scene="hand">B · Cynobot reaching</button>
+    <button data-scene="neuron">D · Neuron firing</button>
+    <button data-scene="atom">E · Atom</button>
+    <button data-scene="spark">F · Neural atom</button>
+    <button data-scene="brain">G · Brain</button>
+    <span class="sep"></span>
+    <button id="btnFrame" class="on">C · Website frame</button>
+    <button id="btnTheme">Colour: Red</button>
+    <span class="fps" id="fps"></span>
+  </div>
+
+  <script src="particles.js?v=15"></script>
+  <script>
+  (function () {
+    const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+    let W = 0, H = 0, dpr = 1;
+    let C = {};
+    function colours() {
+      const st = getComputedStyle(document.body), v = (n) => st.getPropertyValue(n).trim();
+      C = { acc: v('--cy-accent-rgb'), shine: v('--cy-p3'), text: v('--cy-text-rgb'), grey: '205, 212, 226' };
+    }
+    const rgba = (rgb, a) => `rgba(${rgb}, ${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const ease = (x) => 1 - Math.pow(1 - clamp(x, 0, 1), 2.2);
+    function seeded(s) { return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646; }
+
+    // 3D projection used by the woven scenes (same idea as the website's splash).
+    function project(p, yaw, pitch, scale, cx, cy, t) {
+      const w = Math.sin(t * 1.6 + p.y * 5 + p.x * 4) * 0.0045;
+      const x0 = p.x + w, y0 = p.y + w * 0.6, z0 = p.z;
+      const x1 = x0 * Math.cos(yaw) - z0 * Math.sin(yaw), z1 = x0 * Math.sin(yaw) + z0 * Math.cos(yaw);
+      const y2 = y0 * Math.cos(pitch) - z1 * Math.sin(pitch), z2 = y0 * Math.sin(pitch) + z1 * Math.cos(pitch);
+      const k = 1.65 / (1.65 - z2 * 0.72);
+      return { x: cx + x1 * scale * k, y: cy + y2 * scale * k, z: z2, k };
+    }
+    // Strands woven around capsules [x1,y1,z1,r1, x2,y2,z2,r2, count].
+    function weave(caps, rand) {
+      const out = [];
+      caps.forEach(([x1, y1, z1, r1, x2, y2, z2, r2, n]) => {
+        for (let i = 0; i < n; i++) {
+          const pts = [], a0 = rand() * 6.283, twist = (rand() - 0.5) * 3.8, f = 1.5 + rand() * 3, ph = rand() * 6.283, amp = 0.35 + rand() * 0.85;
+          for (let s = 0; s <= 11; s++) {
+            const t = s / 11, r = (r1 + (r2 - r1) * t) * (0.55 + 0.65 * Math.sin(t * 2.83 + ph) * 0.45 + 0.35), ang = a0 + twist * t + Math.sin(t * Math.PI * f + ph) * amp;
+            pts.push({ x: x1 + (x2 - x1) * t + Math.cos(ang) * r, y: y1 + (y2 - y1) * t + Math.sin(ang) * r * 0.85, z: z1 + (z2 - z1) * t + Math.sin(ang + 1.2) * r });
+          }
+          const acc = rand() < 0.26;
+          out.push({ pts, acc, w: acc ? 0.9 + rand() * 0.8 : 0.45 + rand() * 0.7, a: acc ? 0.55 + rand() * 0.35 : 0.2 + rand() * 0.45, order: rand() * 0.7, sp: 0.35 + rand() * 0.8, off: rand() });
+        }
+      });
+      return out;
+    }
+    function drawStrand(st, proj, alpha, t, pulse) {
+      ctx.beginPath(); ctx.moveTo(proj[0].x, proj[0].y);
+      for (let j = 1; j < proj.length - 1; j++) ctx.quadraticCurveTo(proj[j].x, proj[j].y, (proj[j].x + proj[j + 1].x) / 2, (proj[j].y + proj[j + 1].y) / 2);
+      ctx.lineTo(proj[proj.length - 1].x, proj[proj.length - 1].y);
+      const z = proj.reduce((s, p) => s + p.z, 0) / proj.length, depth = clamp(0.88 + z * 0.85, 0.45, 1.5);
+      ctx.lineWidth = st.w * depth * dpr;
+      ctx.strokeStyle = st.acc ? rgba(C.acc, st.a * alpha) : rgba(C.grey, st.a * 0.62 * alpha);
+      ctx.stroke();
+      if (pulse && st.acc && proj.length > 3) {   // a synaptic pulse running along the strand
+        const pos = ((t * st.sp + st.off) % 1) * (proj.length - 1), i = Math.floor(pos), f = pos - i, A = proj[i], B = proj[Math.min(i + 1, proj.length - 1)];
+        dot(A.x + (B.x - A.x) * f, A.y + (B.y - A.y) * f, 2.2 * A.k * dpr, rgba(C.shine, 0.95 * alpha));
+      }
+    }
+    function dot(x, y, r, col) { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fillStyle = col; ctx.fill(); }
+    function glow(x, y, r, rgb, a) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, rgba(rgb, a)); g.addColorStop(1, rgba(rgb, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+    }
+
+    // ================= A: Neural core =================
+    // Nerves grow in from every edge, gather into a breathing woven core where pulses keep firing,
+    // then let go and gather again (about every 20 s): the website's splash, as a calm loop.
+    const core = {
+      caption: 'A · Neural core: nerves gather from the edges into a breathing core that keeps sparking, then let go and gather again (about every 20 s).',
+      init() {
+        const rand = seeded(4219);
+        this.nerves = [];
+        for (let i = 0; i < 72; i++) {
+          const e = i % 4; let sx, sy;
+          if (e === 0) { sx = 0.05 + rand() * 0.9; sy = -0.06; } else if (e === 1) { sx = 1.06; sy = 0.05 + rand() * 0.9; }
+          else if (e === 2) { sx = 0.05 + rand() * 0.9; sy = 1.06; } else { sx = -0.06; sy = 0.05 + rand() * 0.9; }
+          const acc = rand() < 0.36;
+          this.nerves.push({ sx, sy, ox: (rand() - 0.5) * 0.05, oy: (rand() - 0.5) * 0.06, b1: (rand() - 0.5) * 0.18, b2: (rand() - 0.5) * 0.18,
+            delay: rand() * 0.16, acc, w: acc ? 1.15 + rand() * 0.75 : 0.6 + rand() * 0.6, a: acc ? 0.6 + rand() * 0.3 : 0.25 + rand() * 0.3, sp: 0.3 + rand() * 0.5, off: rand() });
+        }
+        // the core: strands woven around a small sphere
+        const caps = [];
+        for (let k = 0; k < 6; k++) { const a = k * 1.047; caps.push([Math.cos(a) * 0.05, Math.sin(a) * 0.05, -0.06, 0.1, -Math.cos(a) * 0.05, -Math.sin(a) * 0.05, 0.06, 0.1, 14]); }
+        this.ball = weave(caps, seeded(77));
+      },
+      draw(t) {
+        const P = 20, cyc = (t % P) / P, cx = W * 0.5, cy = H * 0.4, m = Math.min(W, H);
+        const gather = ease(cyc / 0.3), release = clamp((cyc - 0.82) / 0.18, 0, 1), hold = gather * (1 - release);
+        for (let i = 0; i < this.nerves.length; i++) {
+          const n = this.nerves[i];
+          const local = ease((gather - n.delay) / 0.84), keep = 1 - ease((release - n.delay * 0.5) / 0.9);
+          const reach = Math.min(local, 1), from = 1 - keep;   // during release the inner part pulls back toward the edge
+          if (reach <= 0.01 || from >= reach) continue;
+          const x0 = n.sx * W, y0 = n.sy * H, x3 = cx + n.ox * W, y3 = cy + n.oy * H, dx = x3 - x0, dy = y3 - y0, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+          const pt = (u) => { const wave = Math.sin(u * 6.9 + t * 1.6 + i) * (1 - u) * m * 0.05;
+            return [x0 + dx * u + nx * (n.b1 * W * u * (1 - u) + wave), y0 + dy * u + ny * (n.b2 * H * u * (1 - u) + wave)]; };
+          ctx.beginPath();
+          const u0 = 0, u1 = reach * (1 - from * 0.999);
+          for (let s = 0; s <= 18; s++) { const [x, y] = pt(u0 + (u1 - u0) * (s / 18)); s ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+          ctx.lineWidth = n.w * dpr;
+          ctx.strokeStyle = n.acc ? rgba(C.acc, n.a * (0.4 + 0.6 * hold)) : rgba(C.grey, n.a * 0.6);
+          ctx.stroke();
+          if (n.acc) {
+            if (hold > 0.6) { const u = ((t * n.sp + n.off) % 1) * u1, [x, y] = pt(u); dot(x, y, 2.4 * dpr, rgba(C.shine, 0.95 * hold)); }   // pulses flowing in
+            else { const [x, y] = pt(u1); dot(x, y, 2.4 * dpr, rgba(C.shine, 0.8)); }   // the growing tip
+          }
+        }
+        // the core breathes and flashes as pulses arrive
+        const breathe = 1 + Math.sin(t * 1.2) * 0.06, flash = Math.pow(Math.max(0, Math.sin(t * 3.9)), 12) * hold;
+        glow(cx, cy, m * 0.2 * breathe, C.acc, 0.14 + 0.18 * hold + flash * 0.2);
+        glow(cx, cy, m * 0.06 * breathe, C.shine, 0.12 * hold + flash * 0.35);
+        const yaw = t * 0.35, pitch = Math.sin(t * 0.4) * 0.25;
+        for (const st of this.ball) {
+          const vis = clamp((hold * 1.3 - st.order) / 0.4, 0, 1);
+          if (vis <= 0.02) continue;
+          const proj = st.pts.map((p) => project({ x: p.x * breathe, y: p.y * breathe, z: p.z * breathe }, yaw, pitch, m * 1.25, cx, cy, t));
+          drawStrand(st, proj, vis, t, true);
+        }
+      },
+    };
+
+    // ================= B: Cynobot reaching =================
+    // Cynobot's own hand, woven from nerve strands, reaching out to the visitor (the website shows a
+    // human hand reaching; here the robot reaches back). The index fingertip glows: "tap me".
+    const hand = {
+      caption: 'B · Cynobot reaching: a robot hand woven from nerve strands reaches toward the visitor, pulses running through it; the fingertip glows as if inviting a tap.',
+      init() {
+        // forearm, wrist band, palm, four segmented fingers and a thumb (x right, y down, z toward the viewer)
+        const caps = [
+          [0.42, 0.42, -0.25, 0.075, 0.14, 0.12, 0.05, 0.065, 46],   // forearm
+          [0.14, 0.12, 0.05, 0.07, 0.08, 0.06, 0.14, 0.07, 18],      // wrist
+          [0.08, 0.06, 0.14, 0.085, -0.02, -0.04, 0.26, 0.08, 40],   // palm
+          [-0.02, -0.06, 0.27, 0.022, -0.07, -0.17, 0.33, 0.019, 14], [-0.07, -0.17, 0.33, 0.019, -0.1, -0.27, 0.37, 0.015, 12],  // index
+          [-0.04, -0.03, 0.29, 0.022, -0.12, -0.11, 0.35, 0.019, 14], [-0.12, -0.11, 0.35, 0.019, -0.17, -0.18, 0.37, 0.015, 12], // middle
+          [-0.05, 0.0, 0.28, 0.02, -0.13, -0.05, 0.33, 0.017, 12], [-0.13, -0.05, 0.33, 0.017, -0.18, -0.09, 0.34, 0.014, 10],    // ring
+          [-0.04, 0.03, 0.26, 0.018, -0.11, 0.01, 0.29, 0.015, 10], [-0.11, 0.01, 0.29, 0.015, -0.15, -0.01, 0.3, 0.012, 8],      // little
+          [0.06, -0.02, 0.2, 0.024, 0.04, -0.12, 0.27, 0.018, 12], [0.04, -0.12, 0.27, 0.018, 0.0, -0.19, 0.3, 0.014, 10],         // thumb
+        ];
+        this.joints = [[0.14, 0.12, 0.05], [0.08, 0.06, 0.14], [-0.02, -0.06, 0.27], [-0.07, -0.17, 0.33], [-0.04, -0.03, 0.29], [-0.12, -0.11, 0.35],
+          [-0.05, 0.0, 0.28], [-0.13, -0.05, 0.33], [-0.04, 0.03, 0.26], [-0.11, 0.01, 0.29], [0.06, -0.02, 0.2], [0.04, -0.12, 0.27]].map(([x, y, z]) => ({ x, y, z }));
+        this.tip = { x: -0.1, y: -0.27, z: 0.37 };
+        this.strands = weave(caps, seeded(911));
+        this.t0 = null;
+      },
+      draw(t) {
+        if (this.t0 == null) this.t0 = t;
+        const m = Math.min(W, H), reveal = ease((t - this.t0) / 3.5), cx = W * 0.52, cy = H * 0.42, sc = m * 1.35;
+        const yaw = 0.25 + Math.sin(t * 0.5) * 0.12, pitch = Math.cos(t * 0.42) * 0.07 + 0.08, reach = 1 + Math.sin(t * 0.9) * 0.02;
+        for (const st of this.strands) {
+          const vis = clamp((reveal * 1.2 - st.order) / 0.36, 0, 1);
+          if (vis <= 0.02) continue;
+          const n = Math.max(2, Math.floor(st.pts.length * vis));
+          const proj = st.pts.slice(0, n).map((p) => project({ x: p.x * reach, y: p.y * reach, z: p.z * reach }, yaw, pitch, sc, cx, cy, t));
+          drawStrand(st, proj, Math.min(1, vis * 1.4), t, reveal > 0.9);
+        }
+        for (const j of this.joints) {   // glowing joints, so it reads as a robot hand
+          const p = project({ x: j.x * reach, y: j.y * reach, z: j.z * reach }, yaw, pitch, sc, cx, cy, t);
+          glow(p.x, p.y, 9 * p.k * dpr, C.acc, 0.5 * reveal); dot(p.x, p.y, 2 * p.k * dpr, rgba(C.shine, 0.85 * reveal));
+        }
+        const tp = project({ x: this.tip.x * reach, y: this.tip.y * reach, z: this.tip.z * reach }, yaw, pitch, sc, cx, cy, t), beat = 0.5 + 0.5 * Math.sin(t * 2.4);
+        glow(tp.x, tp.y, (30 + beat * 22) * tp.k * dpr, C.shine, 0.35 * reveal);
+        ctx.beginPath(); ctx.arc(tp.x, tp.y, (14 + ((t * 0.8) % 1) * 46) * tp.k * dpr, 0, 6.283);
+        ctx.strokeStyle = rgba(C.acc, 0.6 * (1 - ((t * 0.8) % 1)) * reveal); ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+      },
+    };
+
+    // ================= D: Neuron firing (lively) =================
+    // Seven neurons, each with branching dendrites, a cell body with a nucleus and one or two
+    // myelinated axons to its neighbours. A spike jumps node to node down the axon with a bright
+    // comet trail, bursts across the synapse as transmitter sparks, lights the next neuron's
+    // dendrite and may make it fire, so activity fans out through the network. Neurons also fire
+    // on their own, small sparks keep running in along the dendrites, and the view drifts gently.
+    const neuron = {
+      caption: 'D · Neuron firing: a living network of seven neurons. Spikes race down myelinated axons node by node, burst across synapses and set off the next cells; small sparks keep flickering in along the dendrites.',
+      SPEED: 0.8,
+      init() {
+        const rand = seeded(1337), m = Math.min(W, H);
+        const spots = [[0.12, 0.2], [0.36, 0.1], [0.6, 0.27], [0.86, 0.13], [0.9, 0.5], [0.66, 0.6], [0.3, 0.47], [0.08, 0.6]];
+        this.cells = spots.map(([x, y], i) => Object.assign(this.makeCell({ x: x * W, y: y * H }, rand, m, i), { fire: -10, input: -10 }));
+        this.axons = [];
+        this.cells.forEach((c, i) => {
+          const near = this.cells.map((o, j) => ({ j, d: j === i ? 1e9 : Math.hypot(o.x - c.x, o.y - c.y) })).sort((a, b) => a.d - b.d);
+          const n = rand() < 0.55 ? 2 : 1;
+          for (let k = 0; k < n; k++) this.axons.push(this.makeAxon(c, i, near[k].j, rand, m, k));
+        });
+        this.bg = document.createElement('canvas'); this.bg.width = W + 120 * dpr; this.bg.height = H + 120 * dpr; this.bgFor = null;
+        this.motes = Array.from({ length: 70 }, () => ({ x: rand() * W, y: rand() * H, r: 0.6 + rand() * 1.8, v: 4 + rand() * 12, ph: rand() * 6 }));
+        this.rand = rand; this.sparks = []; this.events = []; this.queue = []; this.minis = []; this.ripples = []; this.nextSpont = 0.4; this.nextMini = 0;
+      },
+      makeCell(s, rand, m) {
+        const c = { x: s.x, y: s.y, r: m * 0.022, dendrites: [], blob: [] };
+        for (let k = 0; k < 14; k++) c.blob.push(1 + (rand() - 0.5) * 0.35);
+        const n = 6 + Math.floor(rand() * 2);
+        const grow = (x, y, ang, len, w, depth, dist) => {
+          const pts = [{ x, y }], steps = 6; let a = ang, px = x, py = y;
+          for (let k = 1; k <= steps; k++) { a += (rand() - 0.5) * 0.35; px += Math.cos(a) * len / steps; py += Math.sin(a) * len / steps; pts.push({ x: px, y: py }); }
+          c.dendrites.push({ pts, w, depth, dist, len });
+          if (depth < 3) { const kids = depth < 1 ? 2 : (rand() < 0.7 ? 2 : 1);
+            for (let k = 0; k < kids; k++) grow(px, py, a + (k ? 1 : -1) * (0.3 + rand() * 0.45), len * (0.62 + rand() * 0.15), w * 0.66, depth + 1, dist + len); }
+        };
+        for (let k = 0; k < n; k++) { const a = (k / n) * 6.283 + rand() * 0.5; grow(s.x + Math.cos(a) * c.r * 0.9, s.y + Math.sin(a) * c.r * 0.9, a, m * (0.06 + rand() * 0.045), 3, 0, 0); }
+        return c;
+      },
+      makeAxon(c, from, to, rand, m, k) {
+        const nxt = this.cells[to];
+        let best = null, bd = 1e9;
+        nxt.dendrites.forEach((d) => { const tip = d.pts[d.pts.length - 1], dd = Math.hypot(tip.x - c.x, tip.y - c.y); if (dd < bd) { bd = dd; best = d; } });
+        const tip = best.pts[best.pts.length - 1];
+        const ang = Math.atan2(tip.y - c.y, tip.x - c.x), start = { x: c.x + Math.cos(ang + (k ? 0.5 : 0)) * c.r, y: c.y + Math.sin(ang + (k ? 0.5 : 0)) * c.r };
+        const end = { x: tip.x - Math.cos(ang) * m * 0.025, y: tip.y - Math.sin(ang) * m * 0.025 };
+        const bend = (rand() < 0.5 ? 1 : -1) * m * (0.06 + rand() * 0.1);
+        const mid1 = { x: start.x + (end.x - start.x) * 0.33 - Math.sin(ang) * bend, y: start.y + (end.y - start.y) * 0.33 + Math.cos(ang) * bend };
+        const mid2 = { x: start.x + (end.x - start.x) * 0.66 + Math.sin(ang) * bend * 0.6, y: start.y + (end.y - start.y) * 0.66 - Math.cos(ang) * bend * 0.6 };
+        const pts = []; for (let q = 0; q <= 70; q++) { const u = q / 70, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, cc = 3 * (1 - u) * u * u, d = u ** 3;
+          pts.push({ x: a * start.x + b * mid1.x + cc * mid2.x + d * end.x, y: a * start.y + b * mid1.y + cc * mid2.y + d * end.y }); }
+        const cum = [0]; for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1] + Math.hypot(pts[q].x - pts[q - 1].x, pts[q].y - pts[q - 1].y));
+        const terms = []; for (let q = 0; q < 4; q++) { const a2 = ang + (q - 1.5) * 0.45, l = m * (0.02 + rand() * 0.018); terms.push({ x: end.x + Math.cos(a2) * l, y: end.y + Math.sin(a2) * l }); }
+        return { from, to, pts, cum, len: cum[cum.length - 1], end, terms, target: best, tip, fired: -10 };
+      },
+      at(ax, s) { let k = 1; while (k < ax.cum.length - 1 && ax.cum[k] < s) k++; const f = (s - ax.cum[k - 1]) / ((ax.cum[k] - ax.cum[k - 1]) || 1), A = ax.pts[k - 1], B = ax.pts[k];
+        return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f }; },
+      fire(i, t) {
+        const c = this.cells[i];
+        if (t - c.fire < 1.4) return;   // refractory: a neuron can't fire again straight away
+        c.fire = t; this.ripples.push({ x: c.x, y: c.y, t0: t, r: c.r });
+        this.axons.forEach((ax) => { if (ax.from === i) { ax.fired = t; this.queue.push({ t: t + this.SPEED, ax, kind: 'release' }); } });
+      },
+      drawBg() {
+        const b = this.bg.getContext('2d'), rand = seeded(55), m = Math.min(W, H);
+        b.clearRect(0, 0, this.bg.width, this.bg.height); b.filter = `blur(${5 * dpr}px)`;
+        for (let k = 0; k < 10; k++) {
+          const c = this.makeCell({ x: rand() * this.bg.width, y: rand() * this.bg.height }, rand, m * 0.8);
+          b.strokeStyle = rgba(C.acc, 0.09); b.lineCap = 'round';
+          c.dendrites.forEach((d) => { b.lineWidth = d.w * dpr * 0.8; b.beginPath(); d.pts.forEach((p, j) => j ? b.lineTo(p.x, p.y) : b.moveTo(p.x, p.y)); b.stroke(); });
+          b.fillStyle = rgba(C.acc, 0.12); b.beginPath(); b.arc(c.x, c.y, c.r, 0, 6.283); b.fill();
+        }
+        b.filter = 'none'; this.bgFor = C.acc;
+      },
+      draw(t, dt) {
+        const m = Math.min(W, H);
+        if (this.bgFor !== C.acc) this.drawBg();
+        // gentle camera drift; the blurred layer behind moves less (depth)
+        const dx = Math.sin(t * 0.19) * 14 * dpr, dy = Math.cos(t * 0.15) * 10 * dpr;
+        ctx.drawImage(this.bg, -60 * dpr + dx * 0.4, -60 * dpr + dy * 0.4);
+        for (const p of this.motes) { const y = ((p.y - t * p.v) % H + H) % H; dot(p.x + Math.sin(t * 0.5 + p.ph) * 8 + dx * 0.7, y + dy * 0.7, p.r * dpr, rgba(C.grey, 0.16)); }
+        ctx.save(); ctx.translate(dx, dy);
+        // new events are queued and merged here, so none are lost while the list is being filtered
+        if (this.queue.length) { this.events.push(...this.queue); this.queue = []; }
+        // spontaneous firing keeps it alive
+        if (t > this.nextSpont) { this.fire(Math.floor(this.rand() * this.cells.length), t); this.nextSpont = t + 0.7 + this.rand() * 1.3; }
+        // small sparks running in along dendrites (background synaptic input)
+        if (t > this.nextMini) { const c = this.cells[Math.floor(this.rand() * this.cells.length)], d = c.dendrites[Math.floor(this.rand() * c.dendrites.length)];
+          this.minis.push({ d, t0: t, dur: 0.35 + this.rand() * 0.3 }); this.nextMini = t + 0.05 + this.rand() * 0.12; }
+        this.events = this.events.filter((e) => {
+          if (t < e.t) return true;
+          if (e.kind === 'release') {
+            const ax = e.ax;
+            ax.terms.forEach((p) => { for (let k = 0; k < 4; k++) this.sparks.push({ x: p.x, y: p.y, tx: ax.tip.x + (this.rand() - 0.5) * 10 * dpr, ty: ax.tip.y + (this.rand() - 0.5) * 10 * dpr, t0: t, d: 0.25 + this.rand() * 0.15 }); });
+            this.queue.push({ t: t + 0.28, ax, kind: 'input' });
+          } else if (e.kind === 'input') {
+            const c = this.cells[e.ax.to]; c.input = t; c.inputD = e.ax.target;
+            if (this.rand() < 0.82) this.queue.push({ t: t + 0.25 + this.rand() * 0.25, i: e.ax.to, kind: 'fire' });
+          } else if (e.kind === 'fire') this.fire(e.i, t);
+          return false;
+        });
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        this.axons.forEach((ax) => this.drawAxon(ax, t, m));
+        this.cells.forEach((c) => this.drawCell(c, t, m));
+        this.minis = this.minis.filter((mn) => { const u = (t - mn.t0) / mn.dur; if (u >= 1) return false;
+          const pts = mn.d.pts, pos = (1 - u) * (pts.length - 1), k = Math.floor(pos), f = pos - k, A = pts[k], B = pts[Math.min(k + 1, pts.length - 1)];
+          dot(A.x + (B.x - A.x) * f, A.y + (B.y - A.y) * f, 1.6 * dpr, rgba(C.shine, 0.8 * Math.sin(u * Math.PI))); return true; });
+        this.sparks = this.sparks.filter((s) => { const u = (t - s.t0) / s.d; if (u >= 1) return false;
+          dot(s.x + (s.tx - s.x) * u, s.y + (s.ty - s.y) * u, 1.9 * dpr, rgba(C.shine, 1 - u * 0.6)); return true; });
+        this.ripples = this.ripples.filter((r) => { const u = (t - r.t0) / 0.9; if (u >= 1) return false;
+          ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (1.2 + u * 4), 0, 6.283); ctx.lineWidth = 1.6 * dpr; ctx.strokeStyle = rgba(C.acc, 0.6 * (1 - u)); ctx.stroke(); return true; });
+        ctx.restore();
+      },
+      drawAxon(ax, t, m) {
+        const since = t - ax.fired, head = since >= 0 ? (since / this.SPEED) * ax.len : -1;
+        ctx.lineWidth = 1.5 * dpr; ctx.strokeStyle = rgba(C.grey, 0.26);
+        ctx.beginPath(); ax.pts.forEach((p, j) => j ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+        const seg = m * 0.04, gap = m * 0.008;
+        for (let s = gap; s < ax.len - seg * 0.5; s += seg + gap) {   // myelin sheaths, and the node after each
+          ctx.beginPath(); for (let q = 0; q <= 6; q++) { const p = this.at(ax, s + (seg * q) / 6); q ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+          ctx.lineWidth = 6.5 * dpr; ctx.strokeStyle = rgba(C.grey, 0.09); ctx.stroke();
+          const ns = s + seg + gap / 2, hit = head >= 0 ? Math.exp(-Math.abs(head - ns) / (m * 0.018)) : 0;
+          if (hit > 0.05) { const np = this.at(ax, Math.min(ns, ax.len)); glow(np.x, np.y, 20 * dpr * hit, C.shine, 0.75 * hit); dot(np.x, np.y, 2.6 * dpr, rgba(C.shine, hit)); }
+        }
+        if (head >= 0 && head <= ax.len * 1.05) {   // the spike: a bright comet with a fading tail
+          const tail = m * 0.22;
+          for (let s = Math.max(0, head - tail); s < Math.min(head, ax.len); s += 5 * dpr) {
+            const f = 1 - (head - s) / tail, p = this.at(ax, s), q = this.at(ax, Math.min(s + 5 * dpr, ax.len));
+            ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.lineWidth = (1 + f * 3) * dpr; ctx.strokeStyle = rgba(C.acc, 0.15 + f * 0.85); ctx.stroke();
+          }
+          const hp = this.at(ax, Math.min(head, ax.len)); glow(hp.x, hp.y, 26 * dpr, C.shine, 0.8); dot(hp.x, hp.y, 3.2 * dpr, rgba(C.shine, 1));
+        }
+        const arrived = head >= ax.len ? Math.exp(-(since - this.SPEED) * 3) : 0;
+        ax.terms.forEach((p) => {
+          ctx.lineWidth = 1.4 * dpr; ctx.strokeStyle = rgba(arrived > 0.05 ? C.acc : C.grey, 0.32 + arrived * 0.6);
+          ctx.beginPath(); ctx.moveTo(ax.end.x, ax.end.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+          dot(p.x, p.y, 3 * dpr, rgba(arrived > 0.05 ? C.shine : C.grey, 0.4 + arrived * 0.6));
+          if (arrived > 0.05) glow(p.x, p.y, 18 * dpr * arrived, C.acc, 0.65 * arrived);
+        });
+      },
+      drawCell(c, t, m) {
+        const sinceIn = t - c.input, since = t - c.fire;
+        for (const d of c.dendrites) {
+          const lit = d === c.inputD && sinceIn >= 0 ? Math.exp(-sinceIn * 2.4) : 0;
+          const fireGlow = since >= 0 ? Math.exp(-since * 2.8) * Math.max(0, 1 - d.dist / (m * 0.18)) : 0;
+          ctx.lineWidth = d.w * dpr;
+          ctx.strokeStyle = rgba(C.grey, 0.2 + 0.1 * (3 - d.depth) / 3);
+          ctx.beginPath(); d.pts.forEach((p, j) => j ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+          const heat = Math.max(lit, fireGlow * 0.9);
+          if (heat > 0.02) { ctx.strokeStyle = rgba(C.acc, heat); ctx.lineWidth = d.w * dpr * 1.15; ctx.stroke(); }
+        }
+        const f = since >= 0 ? Math.exp(-since * 3) : 0, r = c.r * (1 + f * 0.3 + Math.sin(t * 1.4 + c.x) * 0.03);
+        glow(c.x, c.y, r * (4 + f * 3), C.acc, 0.12 + f * 0.6);
+        ctx.beginPath(); c.blob.forEach((k, j) => { const a = (j / c.blob.length) * 6.283, rr = r * k * (1 + Math.sin(t * 1.3 + j) * 0.04);
+          j ? ctx.lineTo(c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr) : ctx.moveTo(c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr); }); ctx.closePath();
+        ctx.fillStyle = rgba(C.acc, 0.22 + f * 0.55); ctx.fill(); ctx.lineWidth = 1.6 * dpr; ctx.strokeStyle = rgba(C.acc, 0.55 + f * 0.45); ctx.stroke();
+        dot(c.x + r * 0.12, c.y - r * 0.1, r * 0.38, rgba(C.shine, 0.35 + f * 0.65));
+      },
+    };
+
+    // ================= G: Brain =================
+    // A 3D brain made of about 500 neurons (two hemispheres, cerebellum and brainstem) linked to
+    // their nearest neighbours. Neurons fire on their own; a spike travels along each link and may
+    // set off the neighbour, so cascades of activity sweep across the brain like a live scan, with
+    // an occasional bigger "thought wave" from one region. It turns slowly in 3D.
+    const brain = {
+      caption: 'G · Brain: a slowly turning 3D brain of about 500 linked neurons. Spikes cascade from neuron to neuron across it like a live brain scan, with an occasional bigger wave of thought.',
+      init() {
+        const rand = seeded(31415), nodes = [];
+        const add = (x, y, z) => nodes.push({ x, y, z, fire: -10 });
+        // cerebrum: neurons on a folded cortex surface (two hemispheres with a gap), fuller at the
+        // front, flatter underneath; a few inside
+        while (nodes.length < 400) {
+          const zz = rand() * 2 - 1, a = rand() * 6.283, q = Math.sqrt(1 - zz * zz);
+          let dx = Math.cos(a) * q, dy = zz, dz = Math.sin(a) * q;
+          const fold = 1 + 0.07 * Math.sin(dx * 13 + dy * 7) * Math.sin(dy * 11 - dz * 9);   // gyri and sulci
+          const depth = rand() < 0.85 ? 0.95 + rand() * 0.05 : 0.3 + rand() * 0.6;
+          const front = dx < 0 ? 1.06 : 1;
+          const x = dx * 0.36 * front * fold * depth, y = dy * 0.24 * fold * depth, z = dz * 0.27 * fold * depth;
+          if (Math.abs(z) < 0.02 || y > 0.13 - x * 0.1) continue;
+          add(x, y - 0.03, z);
+        }
+        while (nodes.length < 470) {   // cerebellum, tucked under the back
+          const zz = rand() * 2 - 1, a = rand() * 6.283, q = Math.sqrt(1 - zz * zz), k = 0.85 + rand() * 0.15;
+          add(Math.cos(a) * q * 0.12 * k + 0.21, zz * 0.07 * k + 0.14, Math.sin(a) * q * 0.16 * k);
+        }
+        while (nodes.length < 500) { const u = rand(), a = rand() * 6.283, r = Math.sqrt(rand()) * 0.035; add(0.1 + u * 0.03 + Math.cos(a) * r * 0.6, 0.12 + u * 0.18, Math.sin(a) * r); }   // brainstem
+        // links: each neuron to its four nearest neighbours
+        const links = [], seen = new Set();
+        nodes.forEach((n, i) => {
+          nodes.map((o, j) => ({ j, d: j === i ? 9 : (o.x - n.x) ** 2 + (o.y - n.y) ** 2 + (o.z - n.z) ** 2 })).sort((a, b) => a.d - b.d).slice(0, 4)
+            .forEach(({ j, d }) => { const key = i < j ? i + ',' + j : j + ',' + i; if (!seen.has(key)) { seen.add(key); links.push({ a: i, b: j, len: Math.sqrt(d) }); } });
+        });
+        this.nodes = nodes; this.links = links; this.rand = rand;
+        this.nbr = nodes.map(() => []); links.forEach((l, k) => { this.nbr[l.a].push(k); this.nbr[l.b].push(k); });
+        this.signals = []; this.sigQueue = []; this.nextSpont = 0; this.nextWave = 6;
+      },
+      fire(i, t) {
+        const n = this.nodes[i];
+        if (t - n.fire < 1.1) return;
+        n.fire = t;
+        for (const k of this.nbr[i]) { if (this.rand() < 0.3) { const l = this.links[k], to = l.a === i ? l.b : l.a;
+          this.sigQueue.push({ from: i, to, t0: t, dur: 0.18 + l.len * 3.2 }); } }
+      },
+      draw(t, dt) {
+        const m = Math.min(W, H), cx = W * 0.5, cy = H * 0.38, sc = m * 1.15;
+        const yaw = Math.sin(t * 0.2) * 0.45, pitch = 0.1 + Math.sin(t * 0.17) * 0.06;   // mostly a side view
+        const P = this.nodes.map((n) => project(n, yaw, pitch, sc, cx, cy, t));
+        if (this.sigQueue.length) { this.signals.push(...this.sigQueue); this.sigQueue = []; }
+        // spontaneous firing, and now and then a bigger wave from one region
+        if (t > this.nextSpont) { this.fire(Math.floor(this.rand() * this.nodes.length), t); this.nextSpont = t + 0.03 + this.rand() * 0.1; }
+        if (t > this.nextWave) { const c = this.nodes[Math.floor(this.rand() * 400)];
+          this.nodes.forEach((n, i) => { const d = Math.hypot(n.x - c.x, n.y - c.y, n.z - c.z); if (d < 0.12) setTimeout(() => this.fire(i, performance.now() / 1000), d * 2500); });
+          this.nextWave = t + 6 + this.rand() * 5; }
+        // the faint wiring
+        ctx.lineWidth = 0.8 * dpr;
+        ctx.strokeStyle = rgba(C.acc, 0.13);
+        ctx.beginPath(); for (const l of this.links) { const A = P[l.a], B = P[l.b]; ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); } ctx.stroke();
+        // signals travelling along links
+        this.signals = this.signals.filter((s) => {
+          const u = (t - s.t0) / s.dur;
+          if (u >= 1) { this.fire(s.to, t); return false; }
+          const A = P[s.from], B = P[s.to], x = A.x + (B.x - A.x) * u, y = A.y + (B.y - A.y) * u, u0 = Math.max(0, u - 0.35);
+          ctx.beginPath(); ctx.moveTo(A.x + (B.x - A.x) * u0, A.y + (B.y - A.y) * u0); ctx.lineTo(x, y);
+          ctx.lineWidth = 1.8 * dpr; ctx.strokeStyle = rgba(C.acc, 0.85); ctx.stroke();
+          dot(x, y, 1.8 * dpr * A.k, rgba(C.shine, 1));
+          return true;
+        });
+        // neurons: dim dots, flashing when they fire (nearer ones a little bigger)
+        const order = P.map((p, i) => i).sort((a, b) => P[a].z - P[b].z);
+        for (const i of order) {
+          const p = P[i], f = Math.exp(-Math.max(0, t - this.nodes[i].fire) * 3.2) * (t >= this.nodes[i].fire ? 1 : 0), depth = clamp(0.55 + p.z * 1.4, 0.35, 1.2);
+          if (f > 0.04) glow(p.x, p.y, (10 + f * 18) * dpr * p.k, C.acc, 0.55 * f);
+          dot(p.x, p.y, (1.3 + f * 2.2) * dpr * p.k, f > 0.04 ? rgba(C.shine, 0.5 + f * 0.5) : rgba(C.grey, 0.45 * depth));
+        }
+      },
+    };
+
+    // ================= E: Atom =================
+    // A nucleus of protons (theme colour) and neutrons (grey) that jiggles, three tilted orbits
+    // turning slowly in 3D with electrons racing round and leaving light trails, a faint electron
+    // cloud, and now and then a "quantum jump": an electron changes orbit with a flash and a photon ring.
+    const atom = {
+      caption: 'E · Atom: electrons race round a jiggling nucleus of protons and neutrons on tilted 3D orbits; now and then one jumps orbit with a flash and a ring of light.',
+      init() {
+        const rand = seeded(2024);
+        this.nucleons = [];
+        for (let i = 0; i < 16; i++) {   // packed into a small ball
+          const zz = rand() * 2 - 1, a = rand() * 6.283, r = Math.cbrt(rand()) * 0.055, q = Math.sqrt(1 - zz * zz);
+          this.nucleons.push({ x: Math.cos(a) * q * r, y: zz * r, z: Math.sin(a) * q * r, p: i % 2 === 0, ph: rand() * 6.283 });
+        }
+        // orbits: radius, tilt and speed; each holds one or two electrons
+        this.orbits = [
+          { r: 0.17, tx: 1.15, tz: 0.35, sp: 1.6 },
+          { r: 0.25, tx: 0.55, tz: -0.95, sp: 1.15 },
+          { r: 0.33, tx: -0.75, tz: 0.6, sp: 0.85 },
+        ];
+        this.electrons = [{ o: 0, a: 0 }, { o: 1, a: 1.2 }, { o: 1, a: 4.3 }, { o: 2, a: 2.2 }, { o: 2, a: 5.4 }].map((e) => ({ ...e, r: this.orbits[e.o].r, trail: [] }));
+        this.cloud = Array.from({ length: 420 }, () => { const zz = rand() * 2 - 1, a = rand() * 6.283, q = Math.sqrt(1 - zz * zz), r = 0.08 + Math.pow(rand(), 0.6) * 0.32;
+          return { x: Math.cos(a) * q * r, y: zz * r, z: Math.sin(a) * q * r, ph: rand() * 6.283 }; });
+        this.nextJump = 4; this.flashes = []; this.rand = rand;
+      },
+      // a point on an orbit (radius r, tilt tx/tz) at angle a, turned slowly as a whole
+      orbitPoint(o, r, a, t) {
+        let x = Math.cos(a) * r, y = 0, z = Math.sin(a) * r;
+        let c = Math.cos(o.tx), s = Math.sin(o.tx); [y, z] = [y * c - z * s, y * s + z * c];
+        c = Math.cos(o.tz); s = Math.sin(o.tz); [x, y] = [x * c - y * s, x * s + y * c];
+        return { x, y, z };
+      },
+      draw(t, dt) {
+        const m = Math.min(W, H), cx = W * 0.5, cy = H * 0.4, sc = m * 1.25;
+        const yaw = t * 0.18, pitch = Math.sin(t * 0.3) * 0.2;
+        const P = (p) => project(p, yaw, pitch, sc, cx, cy, t);
+        // electron cloud: a faint haze
+        for (const d of this.cloud) { const p = P(d), tw = 0.5 + 0.5 * Math.sin(t * 1.7 + d.ph); dot(p.x, p.y, 1.1 * p.k * dpr, rgba(C.acc, 0.06 + 0.07 * tw)); }
+        // orbit paths
+        this.orbits.forEach((o) => {
+          ctx.beginPath();
+          for (let k = 0; k <= 72; k++) { const q = P(this.orbitPoint(o, o.r, (k / 72) * 6.283, t)); k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+          ctx.lineWidth = 1.2 * dpr; ctx.strokeStyle = rgba(C.grey, 0.16); ctx.setLineDash([3 * dpr, 6 * dpr]); ctx.stroke(); ctx.setLineDash([]);
+        });
+        // nucleus: glow, then the nucleons drawn back to front
+        const beat = 1 + Math.sin(t * 2.2) * 0.04;
+        glow(cx, cy, m * 0.14 * beat, C.acc, 0.3); glow(cx, cy, m * 0.05, C.shine, 0.25);
+        const nuc = this.nucleons.map((n) => { const j = 0.004; return { ...P({ x: n.x * beat + Math.sin(t * 7 + n.ph) * j, y: n.y * beat + Math.cos(t * 6 + n.ph) * j, z: n.z * beat }), p: n.p }; })
+          .sort((a, b) => a.z - b.z);
+        for (const n of nuc) {
+          const r = m * 0.016 * n.k, g = ctx.createRadialGradient(n.x - r * 0.35, n.y - r * 0.35, r * 0.1, n.x, n.y, r);
+          g.addColorStop(0, n.p ? rgba(C.shine, 1) : 'rgba(235, 240, 248, 0.95)'); g.addColorStop(0.55, n.p ? rgba(C.acc, 0.95) : 'rgba(150, 160, 178, 0.9)'); g.addColorStop(1, n.p ? rgba(C.acc, 0.35) : 'rgba(90, 98, 115, 0.4)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 6.283); ctx.fill();
+        }
+        // a quantum jump now and then
+        if (t > this.nextJump) {
+          const e = this.electrons[Math.floor(this.rand() * this.electrons.length)], to = (e.o + (this.rand() < 0.5 ? 1 : 2)) % 3;
+          const from = P(this.orbitPoint(this.orbits[e.o], e.r, e.a, t));
+          e.o = to; e.jump = { from: e.r, t0: t };
+          this.flashes.push({ x: from.x, y: from.y, t0: t });
+          this.nextJump = t + 3.5 + this.rand() * 3;
+        }
+        // electrons with light trails
+        for (const e of this.electrons) {
+          const o = this.orbits[e.o];
+          e.a += o.sp * (dt || 0.016);
+          if (e.jump) { const u = clamp((t - e.jump.t0) / 0.45, 0, 1); e.r = e.jump.from + (o.r - e.jump.from) * ease(u); if (u >= 1) e.jump = null; }
+          const p = P(this.orbitPoint(o, e.r, e.a, t));
+          e.trail.push(p); if (e.trail.length > 22) e.trail.shift();
+          for (let k = 1; k < e.trail.length; k++) {
+            const A = e.trail[k - 1], B = e.trail[k], f = k / e.trail.length;
+            ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineWidth = (0.6 + f * 3) * dpr; ctx.strokeStyle = rgba(C.acc, f * 0.8); ctx.stroke();
+          }
+          glow(p.x, p.y, 16 * p.k * dpr, C.acc, 0.6); dot(p.x, p.y, 3.4 * p.k * dpr, rgba(C.shine, 1));
+        }
+        // photon rings from the jumps
+        this.flashes = this.flashes.filter((f) => { const u = (t - f.t0) / 1.1; if (u >= 1) return false;
+          glow(f.x, f.y, 40 * dpr * (1 - u), C.shine, 0.7 * (1 - u));
+          ctx.beginPath(); ctx.arc(f.x, f.y, (10 + u * 140) * dpr, 0, 6.283); ctx.lineWidth = 2 * dpr; ctx.strokeStyle = rgba(C.shine, 0.7 * (1 - u)); ctx.stroke();
+          return true; });
+      },
+    };
+
+    // ================= F: Neural atom =================
+    // Neural spikes keep shooting in from every edge and converge on a proton core, like the
+    // website's splash; the core is the website's WhatsApp-button atom: a glowing orb with three
+    // tilted orbit rings (-32, +32 and 90 degrees, squashed) and an electron riding each.
+    const spark = {
+      caption: 'F · Neural atom: spikes shoot in from every edge and converge on a glowing proton core (like the website\'s floating button), which flashes as each arrives; three tilted rings carry electrons around it.',
+      init() {
+        const rand = seeded(8086);
+        this.nerves = [];
+        for (let i = 0; i < 64; i++) {
+          const e = i % 4; let sx, sy;
+          if (e === 0) { sx = 0.04 + rand() * 0.92; sy = -0.05; } else if (e === 1) { sx = 1.05; sy = 0.04 + rand() * 0.92; }
+          else if (e === 2) { sx = 0.04 + rand() * 0.92; sy = 1.05; } else { sx = -0.05; sy = 0.04 + rand() * 0.92; }
+          const acc = rand() < 0.4;
+          this.nerves.push({ sx, sy, b1: (rand() - 0.5) * 0.2, b2: (rand() - 0.5) * 0.2, delay: rand() * 0.4, acc,
+            w: acc ? 1.1 + rand() * 0.7 : 0.5 + rand() * 0.6, a: acc ? 0.4 + rand() * 0.25 : 0.16 + rand() * 0.2, next: 1 + rand() * 6, spikes: [] });
+        }
+        this.t0 = null; this.hit = 0; this.rand = rand;
+        this.rings = [{ rot: -32, dur: 2.8, dir: 1 }, { rot: 32, dur: 3.4, dir: -1, white: true }, { rot: 90, dur: 4.1, dir: 1 }];
+      },
+      draw(t, dt) {
+        if (this.t0 == null) this.t0 = t;
+        const m = Math.min(W, H), cx = W * 0.5, cy = H * 0.4, grow = ease((t - this.t0) / 2.5), R = m * 0.065;
+        // nerves: grow in at the start, then carry spikes toward the core
+        for (let i = 0; i < this.nerves.length; i++) {
+          const n = this.nerves[i], reach = ease((grow - n.delay * 0.5) / 0.7);
+          if (reach <= 0.01) continue;
+          const x0 = n.sx * W, y0 = n.sy * H, dx = cx - x0, dy = cy - y0, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+          const end = 1 - (R * 1.15) / len;   // stop at the orb's edge
+          const pt = (u) => { const wave = Math.sin(u * 6.5 + t * 1.4 + i) * (1 - u) * m * 0.045;
+            return [x0 + dx * u + nx * (n.b1 * W * u * (1 - u) + wave), y0 + dy * u + ny * (n.b2 * H * u * (1 - u) + wave)]; };
+          const u1 = end * reach;
+          ctx.beginPath(); for (let k = 0; k <= 20; k++) { const [x, y] = pt((k / 20) * u1); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+          ctx.lineWidth = n.w * dpr; ctx.strokeStyle = n.acc ? rgba(C.acc, n.a) : rgba(C.grey, n.a); ctx.stroke();
+          // fire a spike now and then
+          if (reach > 0.98 && t > n.next) { n.spikes.push({ t0: t, d: 0.9 + this.rand() * 0.7 }); n.next = t + 2.5 + this.rand() * 6; }
+          n.spikes = n.spikes.filter((sp) => {
+            const u = (t - sp.t0) / sp.d;
+            if (u >= 1) { this.hit = Math.min(1.4, this.hit + 0.45); return false; }   // it reached the core
+            const e2 = u * u * end;   // speeds up as it nears the core
+            ctx.beginPath(); for (let k = 0; k <= 8; k++) { const [x, y] = pt(Math.max(0, e2 - 0.1 + (k / 8) * 0.1)); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+            ctx.lineWidth = 2.6 * dpr; ctx.strokeStyle = rgba(C.acc, 0.9); ctx.stroke();
+            const [hx, hy] = pt(e2); glow(hx, hy, 14 * dpr, C.shine, 0.7); dot(hx, hy, 2.6 * dpr, rgba(C.shine, 1));
+            return true;
+          });
+        }
+        this.hit = Math.max(0, this.hit - (dt || 0.016) * 2.2);
+        const pulse = 1 + Math.sin(t * 1.6) * 0.03 + this.hit * 0.12;
+        // glow behind the core
+        glow(cx, cy, R * 4.2 * pulse, C.acc, (0.22 + this.hit * 0.25) * grow);
+        // orbit rings and electrons (drawn in two halves so the orb sits between them)
+        const ringR = R * 1.6, sq = 0.42;
+        const ring = (r, front) => {
+          const rot = (r.rot * Math.PI) / 180, a = ((t / r.dur) * 6.283) * r.dir;
+          ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(1, sq);
+          ctx.beginPath(); ctx.arc(0, 0, ringR * pulse, front ? 0 : Math.PI, front ? Math.PI : 6.283);
+          ctx.restore();
+          ctx.lineWidth = 1.6 * dpr; ctx.strokeStyle = rgba(r.white ? C.shine : C.acc, 0.5 * grow); ctx.stroke();
+          const ex = Math.cos(a) * ringR * pulse, ey = Math.sin(a) * ringR * pulse * sq, inFront = Math.sin(a) > 0;
+          if (inFront === front) {
+            const px = cx + ex * Math.cos(rot) - ey * Math.sin(rot), py = cy + ex * Math.sin(rot) + ey * Math.cos(rot);
+            glow(px, py, 16 * dpr, r.white ? C.shine : C.acc, 0.8 * grow); dot(px, py, 4 * dpr, r.white ? `rgba(255,255,255,${grow})` : rgba(C.shine, grow));
+          }
+        };
+        this.rings.forEach((r) => ring(r, false));
+        // the proton orb: a glowing gradient ball with a light rim and a shine
+        const r = R * pulse, g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+        g.addColorStop(0, rgba(C.acc, grow)); g.addColorStop(1, rgba(C.shine, grow));
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.fillStyle = g; ctx.fill();
+        ctx.lineWidth = 1.8 * dpr; ctx.strokeStyle = `rgba(255,255,255,${0.45 * grow})`; ctx.stroke();
+        const hl = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, 0, cx - r * 0.35, cy - r * 0.4, r * 0.8);
+        hl.addColorStop(0, `rgba(255,255,255,${0.55 * grow})`); hl.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = hl; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.fill();
+        if (this.hit > 0.05) glow(cx, cy, r * 1.6, C.shine, this.hit * 0.45);   // the flash when a spike lands
+        this.rings.forEach((r2) => ring(r2, true));
+      },
+    };
+
+    // ================= scene switching =================
+    const SCENES = { core, hand, neuron, atom, spark, brain };
+    let scene = 'core', stage = null;
+    function resize() {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = cv.width = Math.round(innerWidth * dpr); H = cv.height = Math.round(innerHeight * dpr);
+      W = cv.width; H = cv.height;   // scenes work in device pixels
+      Object.values(SCENES).forEach((s) => s.init());
+    }
+    function setScene(name) {
+      scene = name;
+      document.querySelectorAll('[data-scene]').forEach((b) => b.classList.toggle('on', b.dataset.scene === name));
+      const globe = name === 'globe';
+      document.getElementById('gl').style.display = globe ? 'block' : 'none';
+      cv.style.display = globe ? 'none' : 'block';
+      if (globe && !stage && window.CynoParticles) stage = CynoParticles.create(document.getElementById('gl'));
+      if (stage) stage.pause(!globe);
+      if (SCENES[name] && SCENES[name].init) SCENES[name].init();
+      document.getElementById('caption').textContent = globe ? 'Globe: the current idle shape (particles).' : SCENES[name].caption;
+    }
+    document.querySelectorAll('[data-scene]').forEach((b) => b.addEventListener('click', () => setScene(b.dataset.scene)));
+    document.getElementById('btnFrame').addEventListener('click', (e) => { document.body.classList.toggle('frame'); e.target.classList.toggle('on'); });
+    document.getElementById('btnTheme').addEventListener('click', (e) => {
+      const blue = document.body.classList.toggle('theme-blue'); colours();
+      e.target.textContent = 'Colour: ' + (blue ? 'Blue' : 'Red');
+      if (stage) stage.setTheme(blue ? 'BLUE' : 'RED');
+    });
+    addEventListener('resize', resize);
+    colours(); resize(); setScene(new URLSearchParams(location.search).get('scene') || 'core');
+
+    let frames = 0, fpsAt = performance.now();
+    function loop(now) {
+      const t = now / 1000;
+      if (scene !== 'globe') { ctx.clearRect(0, 0, W, H); SCENES[scene].draw(t, Math.min(0.05, t - (loop.last || t))); }
+      loop.last = t;
+      frames++;
+      if (now - fpsAt > 1000) { document.getElementById('fps').textContent = `${Math.round(frames * 1000 / (now - fpsAt))} fps`; frames = 0; fpsAt = now; }
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+    window.lab = { setScene };
+  })();
+  </script>
+</body>
+</html>

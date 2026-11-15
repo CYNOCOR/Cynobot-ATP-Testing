@@ -2,7 +2,7 @@
 
    No libraries, so it works with no internet. All motion runs in the vertex shader on the
    graphics chip; JavaScript only uploads a new target shape when the state changes.
-   States: idle (a slow flowing ribbon), topic (a line drawing for what Cynobot is talking about), listen (a ring that ripples with the voice),
+   States: idle (a breathing globe, aurora bands or a constellation, see IDLE_STYLES), topic (a line drawing for what Cynobot is talking about), listen (a ring that ripples with the voice),
    think (a slow swirl), answer (a flowing wave), games (a calm horizon).
 
      const stage = CynoParticles.create(canvas);
@@ -20,10 +20,27 @@
     uniform vec3 uColA, uColB, uColC;
     varying vec4 vColor;
 
-    vec3 behave(vec3 p, float group, float t) {
-      // Idle ribbon: a slow swell travels along it, so it seems to breathe.
-      p.y += uFlow * sin(p.x * 3.0 - t * 0.9) * 0.05;
-      p.z += uFlow * cos(p.x * 2.4 - t * 0.7) * 0.10;
+    // w: how much each idle part's own motion applies (x globe, y orbit ring, z aurora, w stars).
+    // It eases in and out with each particle's morph, so changing shape never jumps.
+    vec3 behave(vec3 p, vec4 w, float t) {
+      // A slow swell travels along aurora bands and topic drawings.
+      float swell = uFlow * (1.0 - w.x - w.y - w.w);
+      p.y += swell * sin(p.x * 3.0 - t * 0.9) * 0.05;
+      p.z += swell * cos(p.x * 2.4 - t * 0.7) * 0.10;
+      // Breathing globe: it turns slowly and swells a little, like breathing.
+      float ga = t * 0.32 * w.x;
+      p = vec3(p.x * cos(ga) + p.z * sin(ga), p.y, -p.x * sin(ga) + p.z * cos(ga));
+      p *= 1.0 + 0.05 * sin(t * 1.15) * w.x;
+      // Its dotted ring orbits on a tilt.
+      float ra = t * 0.55 * w.y;
+      p = vec3(p.x * cos(ra) + p.z * sin(ra), p.y, -p.x * sin(ra) + p.z * cos(ra));
+      float tx = 0.42 * w.y, tz = 0.3 * w.y;
+      p = vec3(p.x, p.y * cos(tx) - p.z * sin(tx), p.y * sin(tx) + p.z * cos(tx));
+      p = vec3(p.x * cos(tz) - p.y * sin(tz), p.x * sin(tz) + p.y * cos(tz), p.z);
+      // Aurora: the bands roll sideways.
+      p.y += w.z * sin(p.x * 2.2 + t * 0.8 + p.z * 4.0) * 0.07;
+      // Constellation: drifts a touch.
+      p.xy *= 1.0 + 0.015 * sin(t * 0.9) * w.w;
       float r = length(p.xy) + 0.0001;
       float ang = atan(p.y, p.x);
       // Listening ring: ripples grow with the voice level.
@@ -48,7 +65,14 @@
       vec3 p = mix(aFrom.xyz, aTo.xyz, m);
       // A gentle arc on the way, so particles curve through space.
       p += vec3(aSeed.y - 0.5, aSeed.z - 0.5, aSeed.w - 0.5) * sin(m * 3.14159) * 0.55;
-      if (group < 8.5) p = behave(p, group, t);
+      // Which idle part this particle belongs to, eased across the morph.
+      vec4 w = vec4(0.0);
+      for (int k = 1; k <= 4; k++) {
+        float fk = float(k);
+        float on = (1.0 - step(0.5, abs(aFrom.w - fk))) * (1.0 - m) + (1.0 - step(0.5, abs(aTo.w - fk))) * m;
+        if (k == 1) w.x = on; else if (k == 2) w.y = on; else if (k == 3) w.z = on; else w.w = on;
+      }
+      if (group < 8.5) p = behave(p, w, t);
       // Idle drift, and the outward kick of a celebration.
       p += vec3(sin(t * 0.9 + aSeed.x * 40.0), cos(t * 0.8 + aSeed.y * 40.0), sin(t * 0.7 + aSeed.z * 40.0)) * 0.012;
       p += normalize(p + vec3(0.0001)) * uBurst * (0.35 + aSeed.w * 1.1);
@@ -73,6 +97,7 @@
       vec3 col = g < 0.5 ? mix(uColA, uColB, g * 2.0) : mix(uColB, uColC, g * 2.0 - 1.0);
       float alpha = (0.30 + aSeed.w * 0.55) * clamp(near, 0.75, 1.4);
       if (group > 8.5) alpha *= 0.5;
+      alpha *= mix(1.0, 0.45 + 0.55 * (0.5 + 0.5 * sin(t * 2.6 + aSeed.x * 30.0)), w.w);  // stars twinkle
       vColor = vec4(col, alpha);
     }`;
   const FRAG = `
@@ -136,6 +161,46 @@
     return (iconCache[name] = pts.length ? pts : [0, 0]);
   }
 
+  // ---- idle shapes ----
+  const IDLE_STYLES = ['globe', 'aurora', 'stars'];
+  let idleStyle = 'globe';
+  // Constellation C: stars on an open "C" (for Cynobot and Cynocor), joined by faint lines.
+  const STAR_NODES = (() => {
+    const out = [];
+    for (let k = 0; k < 13; k++) {
+      const a = 0.75 + (k / 12) * (2 * Math.PI - 1.5), r = 0.62 + Math.sin(k * 2.7) * 0.06;
+      out.push([Math.cos(a) * r, Math.sin(a) * r * 0.92, Math.sin(k * 1.9) * 0.12]);
+    }
+    return out;
+  })();
+  const STAR_LINKS = [...STAR_NODES.slice(1).map((_, k) => [k, k + 1]), [1, 4], [5, 8], [8, 11], [2, 6]];
+  /** One idle particle: [x, y, z, group] (1 globe, 2 orbit ring, 3 aurora, 4 star). */
+  function idlePoint(i, u) {
+    const frac = (v) => v - Math.floor(v);
+    if (idleStyle === 'aurora') {  // three soft bands of light flowing sideways
+      const band = i % 3, x = (u * 2 - 1) * 1.55;
+      return [x, (band - 1) * 0.24 + Math.sin(x * 1.8 + band * 1.3) * 0.17 + gauss() * 0.03 * (1 + band * 0.4),
+        (band - 1) * 0.28 + gauss() * 0.05, 3];
+    }
+    if (idleStyle === 'stars') {
+      if (frac(i * 0.381966) < 0.38) {  // the stars themselves
+        const n = STAR_NODES[i % STAR_NODES.length];
+        return [n[0] + gauss() * 0.014, n[1] + gauss() * 0.014, n[2] + gauss() * 0.02, 4];
+      }
+      const [a, b] = STAR_LINKS[i % STAR_LINKS.length], f = rnd(), A = STAR_NODES[a], B = STAR_NODES[b];
+      return [A[0] + (B[0] - A[0]) * f + gauss() * 0.005, A[1] + (B[1] - A[1]) * f + gauss() * 0.005, A[2] + (B[2] - A[2]) * f, 4];
+    }
+    // Breathing globe: points spread evenly over a sphere, and a dotted ring around it.
+    if (frac(i * 0.2763932) < 0.72) {
+      const zz = rnd() * 2 - 1, r = Math.sqrt(1 - zz * zz), a = rnd() * Math.PI * 2;  // random, so no stripes show
+      const R = 0.46 + gauss() * 0.014;
+      return [Math.cos(a) * r * R, zz * R, Math.sin(a) * r * R, 1];
+    }
+    const a = Math.floor(rnd() * 28) / 28 * Math.PI * 2 + rnd() * 0.12;  // 28 dashes, so its turning shows
+    const R = 0.8 + gauss() * 0.012;
+    return [Math.cos(a) * R, gauss() * 0.01, Math.sin(a) * R, 2];
+  }
+
   const rnd = Math.random;
   const gauss = () => (rnd() + rnd() + rnd() + rnd() - 2) / 2;
 
@@ -152,12 +217,8 @@
       if (dust) {  // loose dust that gives the scene depth
         x = (rnd() - 0.5) * 5.2; y = (rnd() - 0.5) * 3.2; z = (rnd() - 0.5) * 3.0 - 0.4; g = 9;
       } else if (name === 'idle') {
-        // A flowing ribbon (a sideways figure of eight). Not a face: the head display is the face.
-        const a = u * Math.PI * 2, d = 1 + Math.sin(a) * Math.sin(a);
-        const w = 0.03 + 0.05 * Math.abs(Math.cos(a));  // thinner where the ribbon crosses itself
-        x = (0.95 * Math.cos(a)) / d + gauss() * w * 0.6;
-        y = (0.95 * Math.sin(a) * Math.cos(a)) / d + gauss() * w;
-        z = Math.sin(a) * 0.32 + gauss() * 0.04;  // one loop leans toward the visitor, the other away
+        // Not a face (the head display is the face), and not a figure of eight (another brand uses it).
+        [x, y, z, g] = idlePoint(i, u);
       } else if (name === 'topic') {
         const k = Math.floor(rnd() * (pts.length / 2)) * 2;
         x = pts[k] + gauss() * 0.012; y = pts[k + 1] + gauss() * 0.012; z = gauss() * 0.05;
@@ -334,6 +395,12 @@
       /** 0..1 loudness of whoever is talking (visitor while listening, Cynobot while answering). */
       setLevel(v) { level = Math.max(0, Math.min(1, v || 0)); },
       setTheme(name) { themeName = name; applyColors(); },
+      /** Which idle shape: 'globe', 'aurora' or 'stars' (a constellation C). */
+      setIdle(style) {
+        if (!IDLE_STYLES.includes(style) || style === idleStyle) return;
+        idleStyle = style;
+        if (state === 'idle') { const keep = state; state = ''; setState(keep); }
+      },
       /** Free area for the face/ring/swirl: its centre (0 = top of screen, 1 = bottom) and height (0..1 of the screen). */
       setFrame(centre, height) {
         frameY = 1 - 2 * Math.max(0, Math.min(1, centre));
@@ -358,5 +425,5 @@
     };
   }
 
-  window.CynoParticles = { create, states: Object.keys(STATES), icons: Object.keys(ICONS), iconPaths: ICONS };
+  window.CynoParticles = { create, states: Object.keys(STATES), icons: Object.keys(ICONS), iconPaths: ICONS, idleStyles: IDLE_STYLES };
 })();

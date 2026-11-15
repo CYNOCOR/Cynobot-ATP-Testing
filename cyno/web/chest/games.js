@@ -23,6 +23,7 @@
     puzzle: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M14.5 14.5h6v6h-6z',
     degree: 'M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5z M6.5 11.7V16c1.6 1.3 3.4 2 5.5 2s3.9-.7 5.5-2v-4.3 M21.5 9.5v5',
     wordchain: 'M4 5h16v11H10l-4 3.5V16H4z M8 9h8 M8 12h5',
+    runner: 'M8 4h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M10 8.5h.01 M14 8.5h.01 M12 13v2 M12 21a2.5 2.5 0 1 0 0-5a2.5 2.5 0 1 0 0 5 M2 21h4 M18 21h4 M12 4V2',
   };
   // Memory Match faces: the particle scene's topic drawings; emoji on the classic backup screen.
   const FACES = window.CynoParticles && CynoParticles.iconPaths
@@ -37,8 +38,12 @@
   }
 
   // ---------- shell ----------
+  let activeCleanup = null;  // stops a running game loop (Cyno Run) when its screen goes away
+  function endActive() { if (activeCleanup) { const f = activeCleanup; activeCleanup = null; f(); } }
   function shell(title, withTimer) {
     clearMini();  // a new game screen replaces one that was moved aside
+    endActive();
+    setPlaying(true);
     root.innerHTML = `
       <div class="g-panel">
         <div class="g-head">
@@ -83,6 +88,8 @@
   function close() {
     stopClock();
     clearMini();
+    endActive();
+    setPlaying(false);
     current = null;
     root.classList.add('hidden');
     root.innerHTML = '';
@@ -129,6 +136,7 @@
     memory: (s) => `${s} moves`,
     puzzle: (s) => `${s} s`,
     wordchain: (s) => `${s} ${s === 1 ? 'word' : 'words'}`,
+    runner: (s) => `${s} points`,
   };
 
   async function finish(score, headline, note) {
@@ -311,6 +319,27 @@
       });
     },
 
+    // ---------- Cyno Run (runner.js) ----------
+    runner() {
+      if (!window.CynoRunner) return menu();
+      levelPick('Cyno Run', 'Choose your level', [{ id: 'easy', label: 'Easy · 3 lives' }, { id: 'normal', label: 'Normal · 1 life' }], (level) => {
+        const body = shell('Cyno Run', true);
+        body.innerHTML = '<div class="g-run" id="gRun"></div>';
+        const tell = (r) => `${r.metres} m and ${r.batteries} ${r.batteries === 1 ? 'battery' : 'batteries'}`;
+        const run = CynoRunner.start($('gRun'), {
+          level,
+          sound: cfg.sound !== false,
+          onCrash: () => faceMoment('dizzy'),  // a life lost (Easy): the head screen sees stars
+          onOver: (r) => finish(r.score, 'Crashed!', tell(r)),
+        });
+        activeCleanup = () => run.stop();
+        current.onPause = () => run.pause();
+        current.onResume = () => run.resume();
+        current.onTimeUp = () => { const r = run.stop(); finish(r.score, "Time's up!", tell(r)); };
+        startClock(true, false);
+      });
+    },
+
     // ---------- Word Chain (voice) ----------
     wordchain() {
       const body = shell('Word Chain', true);
@@ -353,6 +382,21 @@
     drawChain($('gBody'));
   }
 
+  // ---------- the head screen follows the game ----------
+  // While a game is on screen the face looks down at it; a crash in Cyno Run makes it gasp.
+  let playingSent = null;
+  function setPlaying(on) {
+    on = Boolean(on);
+    // Cyno Run draws its own scene: the particle background rests while it is on screen.
+    if (window.CynoChest && CynoChest.gameRunning) CynoChest.gameRunning(on && Boolean(current) && current.id === 'runner');
+    if (on === playingSent) return;
+    playingSent = on;
+    fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game_playing: on }) }).catch(() => {});
+  }
+  function faceMoment(name) {
+    fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ face_moment: { name, id: Date.now() } }) }).catch(() => {});
+  }
+
   // ---------- a question mid-game ----------
   // When the visitor asks Cynobot something during a game, the game steps aside (its clock
   // paused) so the answer, card and QR code show properly. A button brings it back, and it
@@ -377,6 +421,8 @@
       mode: clockMode,
     };
     stopClock();
+    if (current && current.onPause) current.onPause();
+    setPlaying(false);
     root.classList.add('hidden');  // the game stays as it was underneath; only hidden
     resumeAt = 0;
     drawPill();
@@ -390,6 +436,8 @@
     root.classList.remove('hidden');
     lastTouch = Date.now();
     startClock(m.mode.limited, m.mode.voiceGame, m.left);
+    if (current && current.onResume) current.onResume();
+    setPlaying(true);
   }
   function clearMini() {
     mini = null; resumeAt = 0;
@@ -452,4 +500,5 @@
   $('btnGames').addEventListener('click', () => { if (mini) resume(); else if (cfg && cfg.enabled) menu(); });
   ['pointerdown', 'keydown'].forEach((ev) => root.addEventListener(ev, () => { lastTouch = Date.now(); }));
   loadConfig();
+  setPlaying(false);  // a page reloaded mid-game: the face stops watching
 })();
