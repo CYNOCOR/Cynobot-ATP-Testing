@@ -210,7 +210,7 @@
   <audio id="botAudio" autoplay></audio>
   <div class="games hidden" id="games"></div>
 
-  <script src="particles.js?v=15"></script>
+  <script src="particles.js?v=17"></script>
   <script src="brain.js?v=2"></script>
   <script src="devices.js?v=1"></script>
   <script>
@@ -219,11 +219,13 @@
     // uses its plain background and everything else works the same.
     let stage = null;
     const goPlain = () => document.body.classList.add('plain');
-    try { stage = window.CynoParticles ? CynoParticles.create($('stage'), { onLost: goPlain }) : null; } catch (e) { stage = null; }
+    // With the idle brain (brain.js) on top, the particles only make a soft haze while idle.
+    try { stage = window.CynoParticles ? CynoParticles.create($('stage'), { onLost: goPlain, idle: window.CynoBrain ? 'mist' : 'globe' }) : null; } catch (e) { stage = null; }
     if (!stage) goPlain();
     // The idle brain (2D, so it works even without 3D graphics).
     let brain = null;
     try { brain = window.CynoBrain ? CynoBrain.create($('brain')) : null; } catch (e) { brain = null; }
+    if (brain) document.body.classList.add('brain-idle');  // hide the particles from the first frame
     let gameOn = false, brainIdle = false, settleTimer = 0;
     // The particles stop drawing while the brain has the screen, during Cyno Run, or when switched off.
     function refreshStagePause() { if (stage) stage.pause(sceneSetting === 'off' || gameOn || (brainIdle && document.body.dataset.brainSettled === '1')); }
@@ -238,6 +240,8 @@
       if (want) settleTimer = setTimeout(() => { document.body.dataset.brainSettled = '1'; refreshStagePause(); }, 1000);
       refreshStagePause();
     }
+    // Show the brain straight away (the page starts idle); the server's state follows in a moment.
+    document.addEventListener('DOMContentLoaded', () => setBrainIdle(true));
 
     // How much 3D to draw: set in Cyno Control (Controls > Displays > Chest background).
     let sceneSetting = '';

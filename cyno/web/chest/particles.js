@@ -162,7 +162,7 @@
   }
 
   // ---- idle shapes ----
-  const IDLE_STYLES = ['globe', 'aurora', 'stars'];
+  const IDLE_STYLES = ['globe', 'aurora', 'stars', 'mist'];
   let idleStyle = 'globe';
   // Constellation C: stars on an open "C" (for Cynobot and Cynocor), joined by faint lines.
   const STAR_NODES = (() => {
@@ -177,6 +177,9 @@
   /** One idle particle: [x, y, z, group] (1 globe, 2 orbit ring, 3 aurora, 4 star). */
   function idlePoint(i, u) {
     const frac = (v) => v - Math.floor(v);
+    if (idleStyle === 'mist') {  // a soft, shapeless haze (the chest's idle brain is drawn on top)
+      return [gauss() * 0.9, gauss() * 0.45, gauss() * 0.5 - 0.2, 3];
+    }
     if (idleStyle === 'aurora') {  // three soft bands of light flowing sideways
       const band = i % 3, x = (u * 2 - 1) * 1.55;
       return [x, (band - 1) * 0.24 + Math.sin(x * 1.8 + band * 1.3) * 0.17 + gauss() * 0.03 * (1 + band * 0.4),
@@ -238,6 +241,7 @@
   }
 
   function create(canvas, opts = {}) {
+    if (opts.idle && IDLE_STYLES.includes(opts.idle)) idleStyle = opts.idle;  // start with this idle shape (no morph from the globe)
     const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true, powerPreference: 'high-performance' });
     if (!gl) return null;  // caller keeps the plain background
 
